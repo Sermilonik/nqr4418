@@ -97,24 +97,24 @@
             <!-- СИМУЛЯТОР -->
             <div id="simulator" class="simulator hidden">
                 <h4>🧪 Тестовые QR-коды</h4>
-                <p>Используйте эти коды для тестирования системы:</p>
+                <p>Используйте эти коды для тестирования (камера не требуется):</p>
                 
                 <div class="test-codes-grid">
                     <div class="test-code" onclick="scannerManager.simulateScan('0104604063405720219NQNfSwVmcTEST001')">
                         <span class="code-preview">0104604063405720219NQNfSwVmcTEST001</span>
-                        <button class="btn btn-sm">Сканировать</button>
+                        <button class="btn btn-sm btn-success">📦 Сканировать</button>
                     </div>
                     <div class="test-code" onclick="scannerManager.simulateScan('0104604063405720219NQNfSwVmdTEST002')">
                         <span class="code-preview">0104604063405720219NQNfSwVmdTEST002</span>
-                        <button class="btn btn-sm">Сканировать</button>
+                        <button class="btn btn-sm btn-success">📦 Сканировать</button>
                     </div>
                     <div class="test-code" onclick="scannerManager.simulateScan('0104604063405720219NQNfSwVmeTEST003')">
                         <span class="code-preview">0104604063405720219NQNfSwVmeTEST003</span>
-                        <button class="btn btn-sm">Сканировать</button>
+                        <button class="btn btn-sm btn-success">📦 Сканировать</button>
                     </div>
                     <div class="test-code" onclick="scannerManager.simulateScan('0104604063405720219NQNfSwVmfTEST004')">
                         <span class="code-preview">0104604063405720219NQNfSwVmfTEST004</span>
-                        <button class="btn btn-sm">Сканировать</button>
+                        <button class="btn btn-sm btn-success">📦 Сканировать</button>
                     </div>
                 </div>
 
@@ -122,12 +122,14 @@
                     <button onclick="scannerManager.simulateMultipleScans()" class="btn btn-outline">
                         🔄 Добавить 5 тестовых кодов
                     </button>
+                    <button onclick="scannerManager.manualInputCode()" class="btn btn-outline">
+                        ✍️ Ввести код вручную
+                    </button>
                     <button onclick="scannerManager.hideSimulator()" class="btn btn-secondary">
                         ✕ Закрыть симулятор
                     </button>
                 </div>
             </div>
-        </div>
 
         <!-- СПИСОК КОДОВ -->
         <div class="card">
@@ -249,8 +251,8 @@
                     <div class="form-group">
                         <label>CSV данные (Название,Категория):</label>
                         <textarea id="importData" class="form-select" rows="6" placeholder="ООО Ромашка,Оптовый покупатель
-ИП Иванов,Розничная сеть
-ООО Луч,Дилер"></textarea>
+                            ИП Иванов,Розничная сеть
+                            ООО Луч,Дилер"></textarea>
                     </div>
                     <div class="form-help">
                         <small>Формат: каждая строка - отдельный контрагент, поля разделены запятыми</small>
@@ -284,6 +286,39 @@
     <script src="js/app-state.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/notifications.js"></script>
+
+    <script>
+        // РЕЗЕРВНАЯ ЗАГРУЗКА БИБЛИОТЕКИ
+        function loadHtml5QrCode() {
+            return new Promise((resolve, reject) => {
+                if (typeof Html5Qrcode !== 'undefined') {
+                    resolve();
+                    return;
+                }
+        
+                const scripts = [
+                    'https://unpkg.com/html5-qrcode',
+                    'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js',
+                    'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js'
+                ];
+        
+                function tryLoadScript(index) {
+                    if (index >= scripts.length) {
+                        reject(new Error('Не удалось загрузить библиотеку сканирования'));
+                        return;
+                    }
+        
+                    const script = document.createElement('script');
+                    script.src = scripts[index];
+                    script.onload = () => resolve();
+                    script.onerror = () => tryLoadScript(index + 1);
+                    document.head.appendChild(script);
+                }
+        
+                tryLoadScript(0);
+            });
+        }
+        </script>
 
     <!-- ОСНОВНОЙ СКРИПТ СКАНЕРА -->
     <script>
