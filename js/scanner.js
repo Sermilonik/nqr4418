@@ -986,45 +986,177 @@ class ScannerManager {
     }
 
     async startCamera() {
-        if (typeof Html5Qrcode === 'undefined') {
-            showError('Библиотека сканирования не загружена. Используйте симулятор.');
+        console.log('📷 Запускаем камеру...');
+        
+        if (this.isScanning) {
+            console.log('⚠️ Камера уже запущена');
             return;
         }
-
+    
+        // Проверяем выбранных контрагентов
+        if (!this.selectedContractors || this.selectedContractors.length === 0) {
+            showError('Сначала выберите контрагентов');
+            return;
+        }
+    
         try {
+            const reader = document.getElementById('reader');
+            const startBtn = document.getElementById('startCamera');
+            const stopBtn = document.getElementById('stopCamera');
+    
+            if (!reader) {
+                throw new Error('Элемент reader не найден');
+            }
+    
+            // Показываем контейнер с плейсхолдером
+            reader.classList.remove('hidden');
+            reader.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #666; background: black; border-radius: 12px; height: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <div style="font-size: 48px; margin-bottom: 15px;">📷</div>
+                    <p style="color: white; font-size: 18px;">Запуск камеры...</p>
+                    <p style="color: #ccc; margin-top: 10px;">Пожалуйста, подождите</p>
+                </div>
+            `;
+    
+            // Останавливаем предыдущую камеру
+            await this.stopCamera();
+    
+            console.log('🎯 Инициализируем Html5Qrcode...');
+    
+            // Создаем сканер
             this.scanner = new Html5Qrcode("reader");
             
-            await this.scanner.start(
-                { facingMode: "environment" },
-                {
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 }
-                },
-                (decodedText) => this.onScanSuccess(decodedText),
-                (error) => this.onScanFailure(error)
-            );
-
-            this.isScanning = true;
-            this.toggleCameraControls(true);
-            document.getElementById('reader').classList.remove('hidden');
-            showSuccess('Камера запущена', 2000);
+            // Конфигурация сканера
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0,
+                disableFlip: false
+            };
+    
+            console.log('🔍 Получаем список камер...');
             
-        } catch (err) {
-            console.error("Ошибка инициализации камеры:", err);
-            showError('Не удалось запустить камеру. Используйте симулятор.');
+            // Получаем камеры
+            const cameras = await Html5Qrcode.getCameras();
+            console.log('📸 Доступные камеры:', cameras);
+    
+            if (cameras.length === 0) {
+                throw new Error('Камеры не найдены на устройстве');
+            }
+    
+            // Выбираем камеру (предпочтительно заднюю)
+            let cameraId = cameras[0].id;
+            const rearCamera = cameras.find(cam => 
+                cam.label.toLowerCase().includes('back') || 
+                cam.label.toLowerCase().includes('rear') ||
+                cam.label.toLowerCase().includes('environment')
+            );
+            
+            if (rearCamera) {
+                cameraId = rearCamera.id;
+                console.log('🎯 Используем заднюю камеру:', rearCamera.label);
+            } else {
+                console.log('🎯 Используем камеру по умолчанию:', cameras[0].label);
+            }
+    
+            console.log('🚀 Запускаем сканирование...');
+    
+            // Запускаем сканирование
+            await this.scanner.start(
+                cameraId,
+                config,
+                (decodedText) => {
+                    // Успешное сканирование!
+                    console.log('✅ QR-код распознан:', decodedText);
+                    this.onScanSuccess(decodedText);
+                },
+                (errorMessage) => {
+                    // Игнорируем ошибки сканирования (это нормально)
+                    console.log('📊 Статус сканирования:', errorMessage);
+                }
+            );
+    
+            this.isScanning = true;
+            
+            // Обновляем UI кнопок
+            if (startBtn) startBtn.classList.add('hidden');
+            if (stopBtn) stopBtn.classList.remove('hidden');
+    
+            console.log('✅ Камера запущена успешно');
+            showSuccess('Камера запущена. Наведите на QR-код', 3000);
+    
+        } catch (error) {
+            console.error('❌ Ошибка запуска камеры:', error);
+            
+            let message = 'Не удалось запустить камеру';
+            if (error.message.includes('NotAllowedError')) {
+                message = 'Доступ к камере запрещен. Разрешите доступ в настройках браузера.';
+            } else if (error.message.includes('NotFoundError')) {
+                message = 'Камера не найдена на устройстве.';
+            } else if (error.message.includes('NotSupportedError')) {
+                message = 'Ваш браузер не поддерживает доступ к камере.';
+            }
+            
+            showError(message);
+            
+            // Показываем fallback options
+            const reader = document.getElementById('reader');
+            if (reader) {
+                reader.innerHTML = `
+                    <div style="text-align: center; padding: 30px; background: #f8f9fa; border-radius: 12px;">
+                        <div style="font-size: 48px; margin-bottom: 15px;">📷</div>
+                        <h4>Камера недоступна</h4>
+                        <p>${message}</p>
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+                            <button class="btn btn-primary" onclick="scannerManager.showManualInput()">
+                                ✍️ Ввести код вручную
+                            </button>
+                            <button class="btn btn-outline" onclick="scannerManager.toggleSimulator()">
+                                🧪 Тестовые коды
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
         }
     }
 
-    stopCamera() {
+    async stopCamera() {
+        console.log('🛑 Останавливаем камеру...');
+        
         if (this.scanner && this.isScanning) {
-            this.scanner.stop().then(() => {
-                this.isScanning = false;
-                this.toggleCameraControls(false);
-                document.getElementById('reader').classList.add('hidden');
-                showWarning('Камера выключена', 2000);
-            }).catch(err => {
-                console.error("Ошибка остановки камеры:", err);
-            });
+            try {
+                await this.scanner.stop();
+                this.scanner.clear();
+                console.log('✅ Камера остановлена');
+            } catch (error) {
+                console.warn('⚠️ Ошибка при остановке камеры:', error);
+            }
+        }
+    
+        this.isScanning = false;
+        this.scanner = null;
+    
+        // Обновляем UI
+        const reader = document.getElementById('reader');
+        const startBtn = document.getElementById('startCamera');
+        const stopBtn = document.getElementById('stopCamera');
+    
+        if (reader) {
+            reader.classList.add('hidden');
+            reader.innerHTML = ''; // Очищаем контейнер
+        }
+    
+        if (startBtn) startBtn.classList.remove('hidden');
+        if (stopBtn) stopBtn.classList.add('hidden');
+    
+        console.log('✅ UI обновлен после остановки камеры');
+    }
+
+    showManualInput() {
+        const code = prompt('Введите QR-код вручную:', '0104604063405720219NQNfSwVmcTEST001');
+        if (code && code.trim()) {
+            this.onScanSuccess(code.trim());
         }
     }
 
@@ -1757,275 +1889,6 @@ class ScannerManager {
         showSuccess('Уведомление отмечено как прочитанное', 2000);
     }
 }
-
-// =============================================
-// ДОПОЛНИТЕЛЬНЫЙ ФУНКЦИОНАЛ QR-СКАНИРОВАНИЯ
-// =============================================
-
-class QRScannerExtension {
-    constructor() {
-        this.html5QrCode = null;
-        this.isScanning = false;
-    }
-
-    async startQRScanning() {
-        console.log('🔍 Запускаем QR сканирование...');
-        
-        if (this.isScanning) {
-            console.log('⚠️ Сканирование уже запущено');
-            return;
-        }
-
-        try {
-            if (typeof Html5Qrcode === 'undefined') {
-                throw new Error('Библиотека Html5Qrcode не загружена');
-            }
-
-            const reader = document.getElementById('reader');
-            if (!reader) {
-                throw new Error('Элемент reader не найден');
-            }
-
-            // Показываем контейнер
-            reader.classList.remove('hidden');
-            reader.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: #666;">
-                    <div style="font-size: 48px; margin-bottom: 15px;">📷</div>
-                    <p>Запуск сканера QR...</p>
-                </div>
-            `;
-
-            await this.stopQRScanning();
-
-            this.html5QrCode = new Html5Qrcode("reader");
-            
-            const config = {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
-            };
-
-            const cameras = await Html5Qrcode.getCameras();
-            console.log('📸 Доступные камеры:', cameras);
-
-            if (cameras.length === 0) {
-                throw new Error('Камеры не найдены');
-            }
-
-            let cameraId = cameras[0].id;
-            const rearCamera = cameras.find(cam => 
-                cam.label.toLowerCase().includes('back') || 
-                cam.label.toLowerCase().includes('rear') ||
-                cam.label.toLowerCase().includes('environment')
-            );
-            
-            if (rearCamera) {
-                cameraId = rearCamera.id;
-                console.log('🎯 Используем заднюю камеру');
-            }
-
-            await this.html5QrCode.start(
-                cameraId,
-                config,
-                (decodedText) => {
-                    console.log('✅ QR-код распознан:', decodedText);
-                    this.onQRCodeScanned(decodedText);
-                },
-                (errorMessage) => {
-                    // Игнорируем ошибки сканирования
-                }
-            );
-
-            this.isScanning = true;
-            
-            // Обновляем UI кнопок
-            const startBtn = document.getElementById('startCamera');
-            const stopBtn = document.getElementById('stopCamera');
-            if (startBtn) startBtn.classList.add('hidden');
-            if (stopBtn) stopBtn.classList.remove('hidden');
-
-            console.log('✅ QR сканирование запущено');
-
-        } catch (error) {
-            console.error('❌ Ошибка QR сканирования:', error);
-            this.handleQRScanError(error);
-        }
-    }
-
-    async stopQRScanning() {
-        if (this.html5QrCode && this.isScanning) {
-            try {
-                await this.html5QrCode.stop();
-                this.html5QrCode.clear();
-            } catch (error) {
-                console.warn('Ошибка при остановке QR сканирования:', error);
-            }
-        }
-        this.isScanning = false;
-        this.html5QrCode = null;
-
-        // Скрываем контейнер и обновляем UI
-        const reader = document.getElementById('reader');
-        const startBtn = document.getElementById('startCamera');
-        const stopBtn = document.getElementById('stopCamera');
-        
-        if (reader) reader.classList.add('hidden');
-        if (startBtn) startBtn.classList.remove('hidden');
-        if (stopBtn) stopBtn.classList.add('hidden');
-    }
-
-    onQRCodeScanned(decodedText) {
-        // Пытаемся использовать существующие методы scannerManager
-        if (window.scannerManager) {
-            if (typeof window.scannerManager.onScanSuccess === 'function') {
-                window.scannerManager.onScanSuccess(decodedText);
-            } else if (typeof window.scannerManager.addScannedCode === 'function') {
-                window.scannerManager.addScannedCode(decodedText);
-            } else if (typeof window.scannerManager.handleScannedCode === 'function') {
-                window.scannerManager.handleScannedCode(decodedText);
-            } else {
-                this.addCodeDirectly(decodedText);
-            }
-        } else {
-            this.addCodeDirectly(decodedText);
-        }
-
-        // Вибрация
-        if (navigator.vibrate) {
-            navigator.vibrate(200);
-        }
-
-        // Уведомление
-        this.showNotification(`Добавлен код: ${decodedText.substring(0, 30)}...`, 'success');
-    }
-
-    addCodeDirectly(code) {
-        const codesList = document.getElementById('codesList');
-        if (!codesList) return;
-
-        // Убираем пустое состояние
-        const emptyState = codesList.querySelector('.empty-state');
-        if (emptyState) emptyState.remove();
-
-        // Проверяем дубликаты
-        const existingCodes = Array.from(codesList.querySelectorAll('.code-text'))
-            .map(el => el.textContent);
-        
-        if (existingCodes.includes(code)) {
-            this.showNotification('Этот код уже был добавлен', 'error');
-            return;
-        }
-
-        // Добавляем код
-        const codeItem = document.createElement('div');
-        codeItem.className = 'code-item';
-        codeItem.innerHTML = `
-            <span class="code-text">${code}</span>
-            <button class="btn btn-sm btn-outline" onclick="this.parentElement.remove(); window.qrScanner.updateCodeCount();">
-                🗑️
-            </button>
-        `;
-        
-        codesList.appendChild(codeItem);
-        this.updateCodeCount();
-    }
-
-    updateCodeCount() {
-        const totalEl = document.getElementById('totalCodes');
-        const generateBtn = document.getElementById('generateReport');
-        
-        if (totalEl && generateBtn) {
-            const count = document.querySelectorAll('.code-item').length;
-            totalEl.textContent = count;
-            generateBtn.disabled = count === 0;
-        }
-    }
-
-    showNotification(message, type) {
-        alert(type === 'error' ? '❌ ' + message : '✅ ' + message);
-    }
-
-    handleQRScanError(error) {
-        console.error('Ошибка QR сканирования:', error);
-        
-        let message = 'Ошибка сканирования QR';
-        if (error.message.includes('NotAllowedError')) {
-            message = 'Доступ к камере запрещен';
-        } else if (error.message.includes('NotFoundError')) {
-            message = 'Камера не найдена';
-        }
-        
-        this.showNotification(message, 'error');
-        
-        // Показываем fallback options
-        const reader = document.getElementById('reader');
-        if (reader) {
-            reader.innerHTML = `
-                <div style="text-align: center; padding: 30px;">
-                    <div style="font-size: 48px; margin-bottom: 15px;">📷</div>
-                    <h4>Сканер недоступен</h4>
-                    <p>Используйте другие способы:</p>
-                    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
-                        <button class="btn btn-primary" onclick="window.qrScanner.showManualInput()">
-                            ✍️ Ввести код вручную
-                        </button>
-                        <button class="btn btn-outline" onclick="window.scannerManager.toggleSimulator()">
-                            🧪 Тестовые коды
-                        </button>
-                    </div>
-                </div>
-            `;
-            reader.classList.remove('hidden');
-        }
-    }
-
-    showManualInput() {
-        const code = prompt('Введите QR-код:', '0104604063405720219NQNfSwVmcTEST001');
-        if (code && code.trim()) {
-            this.onQRCodeScanned(code.trim());
-        }
-    }
-}
-
-// Инициализация QR сканера
-function initializeQRScanner() {
-    window.qrScanner = new QRScannerExtension();
-    console.log('✅ QRScannerExtension инициализирован');
-    
-    // Добавляем кнопку для тестирования QR сканирования
-    addQRScannerButton();
-}
-
-// Добавляем отдельную кнопку для QR сканирования
-function addQRScannerButton() {
-    const scanControls = document.querySelector('.scan-controls');
-    if (!scanControls) return;
-    
-    // Проверяем, не добавлена ли уже кнопка
-    if (document.getElementById('startQRScan')) return;
-    
-    const qrButton = document.createElement('button');
-    qrButton.id = 'startQRScan';
-    qrButton.className = 'btn btn-primary';
-    qrButton.innerHTML = `
-        <span class="btn-icon">🔍</span>
-        Сканировать QR
-    `;
-    
-    qrButton.addEventListener('click', function() {
-        if (window.qrScanner) {
-            window.qrScanner.startQRScanning();
-        }
-    });
-    
-    // Вставляем перед существующими кнопками
-    scanControls.insertBefore(qrButton, scanControls.firstChild);
-}
-
-// Запускаем инициализацию
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(initializeQRScanner, 1500);
-});
 
 let scannerManager;
 document.addEventListener('DOMContentLoaded', () => {
