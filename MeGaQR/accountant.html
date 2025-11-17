@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Просмотр отчетов - Бухгалтерия</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <a href="index.html" class="back-button">← На главную</a>
+            <h1>📊 Просмотр отчетов</h1>
+            <p class="subtitle">Бухгалтерский модуль</p>
+        </header>
+
+        <!-- Статистика -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalReportsCount">0</div>
+                <div class="stat-label">Всего отчетов</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="pendingReportsCount">0</div>
+                <div class="stat-label">Ожидают обработки</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="processedReportsCount">0</div>
+                <div class="stat-label">Обработано</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalCodesCount">0</div>
+                <div class="stat-label">Всего кодов</div>
+            </div>
+        </div>
+
+        <!-- Фильтры -->
+        <div class="card">
+            <h3>Фильтры отчетов</h3>
+            <div class="filters">
+                <select id="statusFilter" class="form-select">
+                    <option value="">Все статусы</option>
+                    <option value="pending">Ожидают обработки</option>
+                    <option value="processed">Обработанные</option>
+                </select>
+                
+                <select id="contractorFilter" class="form-select">
+                    <option value="">Все контрагенты</option>
+                </select>
+                
+                <select id="dateFilter" class="form-select">
+                    <option value="">Все даты</option>
+                    <option value="today">Сегодня</option>
+                    <option value="week">За неделю</option>
+                    <option value="month">За месяц</option>
+                </select>
+                
+                <button id="applyFilters" class="btn btn-primary">Применить</button>
+                <button id="clearFilters" class="btn btn-outline">Сбросить</button>
+            </div>
+        </div>
+
+        <!-- Список отчетов -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Отчеты от склада</h3>
+                <div>
+                    <button id="markAllProcessed" class="btn btn-sm btn-success">✅ Отметить все обработанными</button>
+                    <button id="refreshReports" class="btn btn-sm btn-outline">🔄 Обновить</button>
+                </div>
+            </div>
+
+            <div id="reportsList" class="reports-list">
+                <div class="empty-state">
+                    <span class="empty-icon">📋</span>
+                    <p>Нет доступных отчетов</p>
+                    <small>Отчеты появятся здесь после сканирования на складе</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Детали отчета -->
+        <div id="reportDetails" class="card hidden">
+            <div class="card-header">
+                <h3>Детали отчета</h3>
+                <div>
+                    <button id="processReport" class="btn btn-success">✅ Отметить обработанным</button>
+                    <button onclick="closeReportDetailsFallback()" class="btn btn-secondary">✕ Закрыть</button>
+                </div>
+            </div>
+            
+            <div id="reportContent">
+                <!-- Динамически заполняется -->
+            </div>
+        </div>
+
+        <!-- Уведомления для бухгалтера -->
+        <div id="accountantNotifications" class="notifications-panel hidden">
+            <div class="notifications-header">
+                <h4>📧 Новые отчеты</h4>
+                <button onclick="hideNotificationsFallback()" class="btn btn-sm btn-secondary">✕ Закрыть</button>
+            </div>
+            <div id="notificationsList" class="notifications-list">
+                <!-- Уведомления загружаются динамически -->
+            </div>
+        </div>
+
+        <!-- Синхронизация -->
+        <div class="sync-actions" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc;">
+            <small style="color: #666; display: block; margin-bottom: 8px;">Синхронизация между устройствами:</small>
+            <button class="btn btn-sm btn-outline" onclick="exportReportsGlobal()">
+                📤 Экспорт отчетов
+            </button>
+            <button class="btn btn-sm btn-outline" onclick="importReportsGlobal()">
+                📥 Импорт отчетов
+            </button>
+            <button class="btn btn-sm btn-outline" onclick="syncDataSourcesGlobal()">
+                🔄 Синхронизировать
+            </button>
+            <button class="btn btn-sm btn-outline" onclick="debugStorageGlobal()">
+                🐛 Диагностика
+            </button>
+        </div>
+
+        <!-- Отладка -->
+        <div style="margin-top: 10px;">
+            <button class="btn btn-sm btn-outline" onclick="showDebugInfo()">
+                ℹ️ Инфо системы
+            </button>
+            <button class="btn btn-sm btn-outline" onclick="clearMobileConsole()">
+                🧹 Очистить консоль
+            </button>
+        </div>
+    </div>
+
+    <!-- Кнопка показа уведомлений -->
+    <button id="showNotifications" class="notification-bell" onclick="showNotificationsFallback()">
+        🔔 <span id="notificationCount" class="notification-badge hidden">0</span>
+    </button>
+
+    <!-- Контейнер для всплывающих уведомлений -->
+    <div id="notificationContainer"></div>
+
+    <!-- Библиотеки -->
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bwip-js@2.1.2/dist/bwip-js.min.js"></script>
+
+    <!-- Скрипты -->
+    <script src="js/utils.js"></script>
+    <script src="js/app-state.js"></script>
+    <script src="js/pdf-generator.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/accountant.js"></script>
+
+    <!-- Мобильная консоль -->
+    <div id="mobileConsole" style="position: fixed; bottom: 10px; right: 10px; z-index: 10000;">
+        <button onclick="toggleMobileConsole()" style="background: #007bff; color: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 20px;">
+            🐛
+        </button>
+        <div id="consolePanel" style="display: none; position: absolute; bottom: 60px; right: 0; width: 320px; height: 300px; background: #1e1e1e; color: #00ff00; border: 2px solid #007bff; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 14px;">
+            <div style="background: #007bff; color: white; padding: 8px; border-radius: 6px 6px 0 0;">
+                <strong>Мобильная консоль</strong>
+                <button onclick="clearMobileConsole()" style="float: right; background: #ff4444; color: white; border: none; border-radius: 4px; padding: 2px 8px;">🧹</button>
+            </div>
+            <div id="consoleOutput" style="height: 220px; overflow-y: auto; padding: 10px; border-bottom: 1px solid #333;">
+                <!-- Сюда выводятся логи -->
+            </div>
+            <div style="padding: 8px;">
+                <input type="text" id="consoleInput" placeholder="Введите команду..." 
+                       style="width: 100%; padding: 8px; border: 1px solid #555; background: #2d2d2d; color: #00ff00; border-radius: 4px; font-family: monospace;"
+                       onkeypress="handleConsoleInput(event)">
+                <small style="color: #888; display: block; margin-top: 5px;">
+                    Доступные команды: debug, reports, contractors, storage, clear, help, fix
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // Проверка загрузки всех скриптов
+    console.log('🔧 Checking script loading...');
+    console.log('utils.js:', typeof showSuccess !== 'undefined' ? '✅' : '❌');
+    console.log('app-state.js:', typeof AppState !== 'undefined' ? '✅' : '❌');
+    console.log('pdf-generator.js:', typeof PDFGenerator !== 'undefined' ? '✅' : '❌');
+    console.log('notifications.js:', typeof NotificationManager !== 'undefined' ? '✅' : '❌');
+    console.log('accountant.js:', typeof AccountantManager !== 'undefined' ? '✅' : '❌');
+
+    // Мобильная консоль с вводом команд
+    let consoleVisible = false;
+    const consoleOutput = document.getElementById('consoleOutput');
+    const consolePanel = document.getElementById('consolePanel');
+    const consoleInput = document.getElementById('consoleInput');
+    
+    function toggleMobileConsole() {
+        consoleVisible = !consoleVisible;
+        consolePanel.style.display = consoleVisible ? 'block' : 'none';
+        if (consoleVisible) {
+            setTimeout(() => consoleInput.focus(), 100);
+        }
+    }
+    
+    // Обработчик ввода команд
+    function handleConsoleInput(event) {
+        if (event.key === 'Enter') {
+            const command = consoleInput.value.trim();
+            consoleInput.value = '';
+            
+            // Выводим команду в консоль
+            addToConsole(`<span style="color: #ffff00">&gt; ${command}</span>`);
+            
+            // Обрабатываем команду
+            executeCommand(command);
+        }
+    }
+    
+    // Выполнение команд
+    function executeCommand(command) {
+        switch(command.toLowerCase()) {
+            case 'debug':
+            case 'info':
+                showDebugInfo();
+                break;
+            case 'restorecontractors':
+                restoreDefaultContractors();
+                break;
+            case 'clear':
+                clearMobileConsole();
+                break;
+            case 'help':
+                showHelp();
+                break;
+            case 'reports':
+                showReportsDebug();
+                break;
+            case 'contractors':
+                showContractorsDebug();
+                break;
+            case 'storage':
+                showStorageDebug();
+                break;
+            case 'test':
+                addToConsole('✅ Тестовая команда выполнена!');
+                console.log('Тест из мобильной консоли');
+                break;
+            case 'fix':
+                fixManagers();
+                break;
+            case 'reset':
+                resetData();
+                break;
+            case 'refreshstats':
+                refreshStats();
+                break;
+            default:
+                if (command) {
+                    addToConsole(`❌ Неизвестная команда: "${command}"`);
+                    addToConsole('💡 Введите "help" для списка команд');
+                }
+        }
+    }
+
+    // Восстановление контрагентов по умолчанию
+    function restoreDefaultContractors() {
+        try {
+            const defaultContractors = [
+                { id: 1, name: 'ООО "Ромашка"', category: 'Оптовый покупатель', createdAt: new Date().toISOString() },
+                { id: 2, name: 'ИП Иванов', category: 'Розничная сеть', createdAt: new Date().toISOString() },
+                { id: 3, name: 'ООО "Луч"', category: 'Дилер', createdAt: new Date().toISOString() },
+                { id: 4, name: 'АО "Вектор"', category: 'Партнер', createdAt: new Date().toISOString() },
+                { id: 5, name: 'ООО "Луч Саяны"', category: 'Дилер', createdAt: new Date().toISOString() },
+                { id: 6, name: 'АО "Луч Восток"', category: 'Партнер', createdAt: new Date().toISOString() },
+                { id: 7, name: 'ИП Лучистый', category: 'Розничная сеть', createdAt: new Date().toISOString() }
+            ];
+            
+            localStorage.setItem('honest_sign_contractors', JSON.stringify(defaultContractors));
+            
+            console.log('✅ Default contractors restored:', defaultContractors);
+            addToConsole('✅ Контрагенты восстановлены!');
+            addToConsole(`👥 Добавлено ${defaultContractors.length} контрагентов`);
+            
+            // Обновляем интерфейс если менеджер доступен
+            if (window.accountantManager) {
+                accountantManager.loadContractorsFromStorage();
+            }
+            
+            // Показываем список
+            showContractorsDebug();
+            
+        } catch (error) {
+            console.error('❌ Error restoring contractors:', error);
+            addToConsole('❌ Ошибка при восстановлении контрагентов: ' + error.message);
+        }
+    }
+
+    // Отладочная информация об отчетах (работает без менеджеров)
+    function showReportsDebug() {
+        console.log('=== ОТЧЕТЫ ДЕБАГ ===');
+    
+        try {
+            const warehouseReports = JSON.parse(localStorage.getItem('warehouse_reports') || '[]');
+            const appStateReports = JSON.parse(localStorage.getItem('honest_sign_reports') || '[]');
+            const sentSessions = JSON.parse(localStorage.getItem('honest_sign_sent_sessions') || '[]');
+        
+            console.log('📊 Warehouse reports:', warehouseReports);
+            console.log('📊 AppState reports:', appStateReports);
+            console.log('📊 Sent sessions:', sentSessions);
+        
+            addToConsole(`<strong>📊 Сводка по отчетам:</strong>`);
+            addToConsole(`• Warehouse reports: ${warehouseReports.length}`);
+            addToConsole(`• AppState reports: ${appStateReports.length}`);
+            addToConsole(`• Sent sessions: ${sentSessions.length}`);
+            
+            // Детальная информация
+            if (warehouseReports.length > 0) {
+                addToConsole(`<strong>📋 Детали отчетов:</strong>`);
+                warehouseReports.forEach((report, index) => {
+                    addToConsole(`${index + 1}. ID: ${report.id || 'N/A'}`);
+                    addToConsole(`   Контрагент: ${report.contractorName || report.contractorId}`);
+                    addToConsole(`   Коды: ${report.codes ? report.codes.length : 0}`);
+                    addToConsole(`   Статус: ${report.status || 'pending'}`);
+                    addToConsole(`   Порядковый №: ${report.sequentialNumber || 'N/A'}`);
+                    addToConsole(`---`);
+                });
+            }
+            
+        } catch (error) {
+            console.error('Reports debug error:', error);
+            addToConsole('❌ Ошибка при получении отчетов: ' + error.message);
+        }
+    }
+
+    // Отладочная информация о контрагентах (работает без менеджеров)
+    function showContractorsDebug() {
+        console.log('=== КОНТРАГЕНТЫ ДЕБАГ ===');
+        
+        try {
+            const contractors = JSON.parse(localStorage.getItem('honest_sign_contractors') || '[]');
+            const selectedContractors = JSON.parse(localStorage.getItem('honest_sign_selected_contractors') || '{}');
+            
+            console.log('👥 Contractors:', contractors);
+            console.log('👥 Selected contractors:', selectedContractors);
+            
+            addToConsole(`<strong>👥 Контрагенты в системе:</strong>`);
+            addToConsole(`• Всего: ${contractors.length}`);
+            
+            if (contractors.length > 0) {
+                contractors.forEach(contractor => {
+                    addToConsole(`• ${contractor.name} (ID: ${contractor.id}, Категория: ${contractor.category})`);
+                });
+            } else {
+                addToConsole('❌ Контрагенты не найдены в localStorage');
+            }
+            
+            if (selectedContractors.contractorIds) {
+                addToConsole(`<strong>🎯 Выбранные контрагенты:</strong>`);
+                addToConsole(`• ID: ${selectedContractors.contractorIds.join(', ')}`);
+            }
+            
+        } catch (error) {
+            console.error('Contractors debug error:', error);
+            addToConsole('❌ Ошибка при получении контрагентов: ' + error.message);
+        }
+    }
+
+    // Показать все хранилища
+    function showStorageDebug() {
+        console.log('=== ВСЕ ХРАНИЛИЩА ===');
+        
+        addToConsole('<strong>🔍 Все ключи в localStorage:</strong>');
+        
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                addToConsole(`• ${key}: ${value.length} chars`);
+            }
+            
+            // Показать основные хранилища
+            const importantKeys = [
+                'warehouse_reports',
+                'honest_sign_reports', 
+                'honest_sign_contractors',
+                'honest_sign_current_session',
+                'honest_sign_selected_contractors',
+                'warehouse_notifications'
+            ];
+            
+            addToConsole('<strong>📁 Основные хранилища:</strong>');
+            importantKeys.forEach(key => {
+                const value = localStorage.getItem(key);
+                if (value) {
+                    try {
+                        const parsed = JSON.parse(value);
+                        addToConsole(`• ${key}: ${Array.isArray(parsed) ? parsed.length + ' items' : 'object'}`);
+                    } catch {
+                        addToConsole(`• ${key}: string (${value.length} chars)`);
+                    }
+                } else {
+                    addToConsole(`• ${key}: ❌ не найден`);
+                }
+            });
+            
+        } catch (error) {
+            addToConsole('❌ Ошибка при чтении localStorage: ' + error.message);
+        }
+    }
+
+    // Сброс данных (осторожно!)
+    function resetData() {
+        if (confirm('❌ ВНИМАНИЕ! Это удалит ВСЕ данные. Продолжить?')) {
+            try {
+                localStorage.removeItem('warehouse_reports');
+                localStorage.removeItem('honest_sign_reports');
+                localStorage.removeItem('honest_sign_sent_sessions');
+                localStorage.removeItem('warehouse_notifications');
+                
+                addToConsole('✅ Все данные очищены');
+                addToConsole('🔄 Обновите страницу');
+                
+            } catch (error) {
+                addToConsole('❌ Ошибка при сбросе данных: ' + error.message);
+            }
+        }
+    }
+
+    // Попытка исправить менеджеры
+    function fixManagers() {
+        console.log('🔧 Attempting to fix managers...');
+        
+        if (!window.accountantManager && window.AccountantManager) {
+            try {
+                window.accountantManager = new AccountantManager();
+                addToConsole('✅ accountantManager создан');
+            } catch (error) {
+                addToConsole('❌ Ошибка создания accountantManager');
+            }
+        }
+        
+        if (!window.scannerManager && window.ScannerManager) {
+            try {
+                window.scannerManager = new ScannerManager();
+                addToConsole('✅ scannerManager создан');
+            } catch (error) {
+                addToConsole('❌ Ошибка создания scannerManager');
+            }
+        }
+        
+        if (!window.appState && window.AppState) {
+            try {
+                window.appState = new AppState();
+                addToConsole('✅ appState создан');
+            } catch (error) {
+                addToConsole('❌ Ошибка создания appState');
+            }
+        }
+        
+        // Обновим информацию
+        showDebugInfo();
+    }
+
+    // Обновить статистику
+    function refreshStats() {
+        if (window.accountantManager && typeof accountantManager.updateStatistics === 'function') {
+            accountantManager.updateStatistics();
+            addToConsole('✅ Статистика обновлена');
+        } else {
+            updateStatisticsFallback();
+            addToConsole('✅ Статистика обновлена (fallback)');
+        }
+    }
+
+    // Fallback функции
+    function updateStatisticsFallback() {
+        try {
+            const reports = JSON.parse(localStorage.getItem('warehouse_reports') || '[]');
+            const total = reports.length;
+            const pending = reports.filter(r => r.status !== 'processed').length;
+            const processed = reports.filter(r => r.status === 'processed').length;
+            const totalCodes = reports.reduce((sum, r) => sum + (r.codes ? r.codes.length : 0), 0);
+            
+            document.getElementById('totalReportsCount').textContent = total;
+            document.getElementById('pendingReportsCount').textContent = pending;
+            document.getElementById('processedReportsCount').textContent = processed;
+            document.getElementById('totalCodesCount').textContent = totalCodes;
+            
+        } catch (error) {
+            console.error('Fallback statistics error:', error);
+        }
+    }
+
+    function closeReportDetailsFallback() {
+        document.getElementById('reportDetails').classList.add('hidden');
+    }
+
+    function hideNotificationsFallback() {
+        const panel = document.getElementById('accountantNotifications');
+        if (panel) panel.classList.add('hidden');
+    }
+
+    function showNotificationsFallback() {
+        const panel = document.getElementById('accountantNotifications');
+        if (panel) panel.classList.remove('hidden');
+    }
+
+    // Показать справку
+    function showHelp() {
+        addToConsole('📋 <strong>Доступные команды:</strong>');
+        addToConsole('• <strong>debug</strong> - информация о системе');
+        addToConsole('• <strong>reports</strong> - отладочная информация отчетов');
+        addToConsole('• <strong>contractors</strong> - отладочная информация контрагентов');
+        addToConsole('• <strong>storage</strong> - показать все хранилища');
+        addToConsole('• <strong>restorecontractors</strong> - 🔄 ВОССТАНОВИТЬ контрагентов');
+        addToConsole('• <strong>clear</strong> - очистить консоль');
+        addToConsole('• <strong>fix</strong> - попытаться исправить менеджеры');
+        addToConsole('• <strong>refreshstats</strong> - обновить статистику');
+        addToConsole('• <strong>reset</strong> - ⚠️ ОЧИСТИТЬ ВСЕ ДАННЫЕ');
+        addToConsole('• <strong>test</strong> - тестовая команда');
+        addToConsole('• <strong>help</strong> - эта справка');
+    }
+    
+    // Добавить сообщение в консоль
+    function addToConsole(message) {
+        if (consoleOutput) {
+            consoleOutput.innerHTML += `<div style="margin-bottom: 5px; line-height: 1.4;">${message}</div>`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+    }
+    
+    // Очистить консоль
+    function clearMobileConsole() {
+        if (consoleOutput) {
+            consoleOutput.innerHTML = '';
+        }
+    }
+    
+    // Перехватываем console.log для вывода в мобильную консоль
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    
+    console.log = function(...args) {
+        originalLog.apply(console, args);
+        const message = args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+        ).join(' ');
+        addToConsole(`<span style="color: #00ff00">${message}</span>`);
+    };
+    
+    console.error = function(...args) {
+        originalError.apply(console, args);
+        const message = args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+        ).join(' ');
+        addToConsole(`<span style="color: #ff4444">❌ ${message}</span>`);
+    };
+    
+    console.warn = function(...args) {
+        originalWarn.apply(console, args);
+        const message = args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+        ).join(' ');
+        addToConsole(`<span style="color: #ffaa00">⚠️ ${message}</span>`);
+    };
+    
+    // Глобальные функции для отладки
+    window.showDebugInfo = function() {
+        console.log('=== СИСТЕМНАЯ ИНФОРМАЦИЯ ===');
+        console.log('User Agent:', navigator.userAgent);
+        console.log('Screen:', screen.width, 'x', screen.height);
+        console.log('Touch supported:', 'ontouchstart' in window);
+        console.log('LocalStorage:', !!localStorage);
+        console.log('scannerManager:', !!window.scannerManager);
+        console.log('accountantManager:', !!window.accountantManager);
+        console.log('appState:', !!window.appState);
+    };
+    
+    // Глобальные функции для кнопок
+    window.exportReportsGlobal = function() {
+        if (window.accountantManager && typeof accountantManager.exportReportsData === 'function') {
+            accountantManager.exportReportsData();
+        } else {
+            // Резервная реализация
+            try {
+                const reports = JSON.parse(localStorage.getItem('warehouse_reports') || '[]');
+                const data = {
+                    reports: reports,
+                    exportedAt: new Date().toISOString(),
+                    device: navigator.userAgent
+                };
+                
+                const dataStr = JSON.stringify(data, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `отчеты_${new Date().toISOString().split('T')[0]}.json`;
+                link.click();
+                
+                URL.revokeObjectURL(url);
+                showSuccess(`Экспортировано ${reports.length} отчетов (резервный метод)`);
+                
+            } catch (error) {
+                console.error('Global export error:', error);
+                showError('Ошибка экспорта: ' + error.message);
+            }
+        }
+    };
+
+    window.importReportsGlobal = function() {
+        if (window.accountantManager && typeof accountantManager.importReportsData === 'function') {
+            accountantManager.importReportsData();
+        } else {
+            showError('Менеджер не доступен. Обновите страницу.');
+        }
+    };
+
+    window.syncDataSourcesGlobal = function() {
+        if (window.accountantManager && typeof accountantManager.syncDataSources === 'function') {
+            accountantManager.syncDataSources();
+        } else {
+            showError('Функция синхронизации не доступна');
+        }
+    };
+
+    window.debugStorageGlobal = function() {
+        if (window.accountantManager && typeof accountantManager.debugStorage === 'function') {
+            accountantManager.debugStorage();
+        } else {
+            showStorageDebug();
+            showInfo('Диагностика выполнена (см. консоль)');
+        }
+    };
+
+    // Автоматически показать информацию при открытии консоли
+    const originalToggle = toggleMobileConsole;
+    toggleMobileConsole = function() {
+        originalToggle();
+        if (consoleVisible) {
+            addToConsole('🚀 Мобильная консоль активирована');
+            addToConsole('💡 Введите "help" для списка команд');
+        }
+    };
+
+    // Автоматическая проверка при загрузке
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🔧 DOM loaded, initializing accountant...');
+        
+        setTimeout(() => {
+            // Всегда создаем менеджера (упрощенная версия уже определена)
+            try {
+                window.accountantManager = new AccountantManager();
+                console.log('✅ AccountantManager initialized successfully');
+                addToConsole('✅ Бухгалтерский модуль инициализирован');
+            } catch (error) {
+                console.error('❌ Error initializing AccountantManager:', error);
+                addToConsole('❌ Ошибка инициализации: ' + error.message);
+                
+                // Создаем простой fallback
+                window.accountantManager = {
+                    loadReports: function() {
+                        console.log('📊 Loading reports (fallback)');
+                        updateStatisticsFallback();
+                    },
+                    updateStatistics: updateStatisticsFallback,
+                    closeReportDetails: closeReportDetailsFallback,
+                    hideNotifications: hideNotificationsFallback,
+                    showNotifications: showNotificationsFallback
+                };
+                addToConsole('✅ Создан fallback менеджер');
+            }
+        }, 500);
+    });
+    </script>
+</body>
+</html>

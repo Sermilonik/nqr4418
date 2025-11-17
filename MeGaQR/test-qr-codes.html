@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тестовые QR-коды</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .qr-container { margin: 20px 0; }
+        .qr-code { 
+            display: inline-block; margin: 10px; padding: 10px; 
+            border: 1px solid #ccc; text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Тестовые QR-коды для разработки</h1>
+    <p>Используйте эти коды для тестирования сканера:</p>
+    
+    <div class="qr-container">
+        <div class="qr-code">
+            <div>Код ЧЗ #1</div>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=0104604063405720219NQNfSwVmcTEST001" alt="QR 1">
+            <div>0104604063405720219NQNfSwVmcTEST001</div>
+        </div>
+        
+        <div class="qr-code">
+            <div>Код ЧЗ #2</div>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=0104604063405720219NQNfSwVmdTEST002" alt="QR 2">
+            <div>0104604063405720219NQNfSwVmdTEST002</div>
+        </div>
+        
+        <div class="qr-code">
+            <div>Код ЧЗ #3</div>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=0104604063405720219NQNfSwVmeTEST003" alt="QR 3">
+            <div>0104604063405720219NQNfSwVmeTEST003</div>
+        </div>
+    </div>
+    
+    <p>Откройте <a href="scanner.html">сканер</a> в отдельном окне и сканируйте эти коды.</p>
+</body>
+</html>

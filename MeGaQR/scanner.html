@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сканирование кодов - Склад</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <a href="index.html" class="back-button">← На главную</a>
+            <h1>📦 Сканирование кодов</h1>
+            <p class="subtitle">Складской модуль</p>
+        </header>
+
+        <!-- Выбор контрагента -->
+        <div class="card">
+            <h3>1. Выберите контрагентов</h3>
+
+            <!-- Поиск и выпадающий список -->
+            <div class="contractor-search">
+                <div class="search-container">
+                    <input type="text" id="contractorSearch" placeholder="🔍 Найти контрагента..." class="form-select">
+                    <button id="closeDropdown" class="btn btn-sm btn-outline hidden">
+                        ✕
+                    </button>
+                </div>
+                <div id="contractorDropdown" class="contractor-dropdown hidden">
+                    <!-- Список контрагентов будет здесь -->
+                </div>
+            </div>
+
+            <!-- Выбранные контрагенты -->
+            <div id="selectedContractors" class="selected-contractors">
+                <div class="selected-header">
+                    <span>Выбрано: <span id="selectedCount">0</span></span>
+                    <button class="btn btn-sm btn-outline" onclick="window.scannerManager.clearContractors()">
+                        🗑️ Очистить
+                    </button>
+                </div>
+                <div id="contractorsList" class="contractors-list">
+                    <!-- Выбранные контрагенты будут здесь -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Управление контрагентами -->
+        <div class="card">
+            <div class="card-header">
+                <h3>👥 Управление контрагентами</h3>
+                <button class="btn btn-sm btn-primary" onclick="scannerManager.showContractorManager()">
+                    ⚙️ Управление
+                </button>
+            </div>
+            <div class="contractor-stats">
+                <span class="badge">Всего: <span id="totalContractors">0</span></span>
+                <span class="badge">Загружено: <span id="loadedContractors">4</span></span>
+            </div>
+        </div>
+
+        <!-- Статус сессии -->
+        <div id="sessionStatus" class="card status-card hidden">
+            <div class="status-header">
+                <span id="statusIcon">⏳</span>
+                <h3 id="statusTitle">Сессия сканирования</h3>
+            </div>
+            <div class="status-info">
+                <div class="status-item">
+                    <span class="label">Контрагент:</span>
+                    <span id="currentContractor">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Отсканировано кодов:</span>
+                    <span id="codesCount" class="badge">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">ID сессии:</span>
+                    <span id="sessionId">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Сканирование -->
+        <div class="card">
+            <h3>2. Сканирование кодов</h3>
+            
+            <div class="scan-controls">
+                <button id="startCamera" class="btn btn-primary" disabled>
+                    <span class="btn-icon">📷</span>
+                    Включить камеру
+                </button>
+                <button id="stopCamera" class="btn btn-secondary hidden">
+                    <span class="btn-icon">⏹️</span>
+                    Выключить камеру
+                </button>
+                <button id="showSimulator" class="btn btn-outline">
+                    <span class="btn-icon">🧪</span>
+                    Симулятор сканирования
+                </button>
+            </div>
+
+            <div id="reader" class="scanner-container hidden">
+                <div class="scanner-placeholder">
+                    <span class="placeholder-icon">📷</span>
+                    <p>Камера запущена. Наведите на QR-код</p>
+                </div>
+            </div>
+
+            <!-- Симулятор -->
+            <div id="simulator" class="simulator hidden">
+                <h4>🧪 Симулятор сканирования</h4>
+                <p>Тестовые QR-коды для проверки системы:</p>
+                
+                <div class="test-codes-grid">
+                    <div class="test-code" onclick="scannerManager.simulateScan('0104604063405720219NQNfSwVmcTEST001')">
+                        <span class="code-preview">0104604063405720219NQNfSwVmcTEST001</span>
+                        <button class="btn btn-sm">Сканировать</button>
+                    </div>
+                    <div class="test-code" onclick="scannerManager.simulateScan('0104604063405720219NQNfSwVmdTEST002')">
+                        <span class="code-preview">0104604063405720219NQNfSwVmdTEST002</span>
+                        <button class="btn btn-sm">Сканировать</button>
+                    </div>
+                    <div class="test-code" onclick="scannerManager.simulateScan('0104604063405720219NQNfSwVmeTEST003')">
+                        <span class="code-preview">0104604063405720219NQNfSwVmeTEST003</span>
+                        <button class="btn btn-sm">Сканировать</button>
+                    </div>
+                    <div class="test-code" onclick="scannerManager.simulateScan('0104604063405720219NQNfSwVmfTEST004')">
+                        <span class="code-preview">0104604063405720219NQNfSwVmfTEST004</span>
+                        <button class="btn btn-sm">Сканировать</button>
+                    </div>
+                </div>
+
+                <div class="simulator-actions">
+                    <button onclick="scannerManager.simulateMultipleScans()" class="btn btn-outline">
+                        🔄 Добавить 5 тестовых кодов
+                    </button>
+                    <button onclick="scannerManager.hideSimulator()" class="btn btn-secondary">
+                        ✕ Закрыть симулятор
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Список кодов -->
+        <div class="card">
+            <div class="card-header">
+                <h3>3. Отсканированные коды</h3>
+                <span id="totalCodes" class="badge">0</span>
+            </div>
+            
+            <div id="codesList" class="codes-list">
+                <div class="empty-state">
+                    <span class="empty-icon">📦</span>
+                    <p>Нет отсканированных кодов</p>
+                    <small>Начните сканирование или используйте симулятор</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Действия -->
+        <div class="card">
+            <h3>4. Формирование отчета</h3>
+            <div class="actions-grid">
+                <button id="generateReport" class="btn btn-success" disabled>
+                    <span class="btn-icon">📄</span>
+                    Сформировать отчет
+                </button>
+                <button id="clearSession" class="btn btn-danger">
+                    <span class="btn-icon">🗑️</span>
+                    Очистить сессию
+                </button>
+            </div>
+        </div>
+
+        <!-- Статусы отчетов -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📊 История отчетов</h3>
+                <button id="refreshReports" class="btn btn-sm btn-outline">🔄 Обновить</button>
+            </div>
+        <!-- Статусы отчетов -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📊 История отчетов</h3>
+            <div>
+                <button id="deleteAllPending" class="btn btn-sm btn-danger">🗑️ Удалить все необработанные</button>
+                <button id="refreshReports" class="btn btn-sm btn-outline">🔄 Обновить</button>
+            </div>
+        </div>
+    
+        <div id="reportsList" class="reports-list">
+            <div class="empty-state">
+                <span class="empty-icon">📄</span>
+                <p>Нет отправленных отчетов</p>
+                <small>Созданные отчеты появятся здесь</small>
+            </div>
+        </div>
+    </div>
+            <div id="reportsList" class="reports-list">
+                <div class="empty-state">
+                    <span class="empty-icon">📄</span>
+                    <p>Нет отправленных отчетов</p>
+                    <small>Созданные отчеты появятся здесь</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Контейнер для всплывающих уведомлений -->
+    <div id="notificationContainer"></div>
+
+    <!-- Панель уведомлений от бухгалтерии -->
+    <div id="warehouseNotifications" class="notifications-panel hidden">
+        <div class="notifications-header">
+            <h4>📧 Уведомления от бухгалтерии</h4>
+            <button onclick="scannerManager.hideNotifications()" class="btn btn-sm btn-secondary">✕ Закрыть</button>
+        </div>
+        <div id="notificationsList" class="notifications-list">
+            <!-- Уведомления загружаются динамически -->
+        </div>
+    </div>
+
+    <!-- Добавьте временно для отладки -->
+    <div class="card">
+        <h3>🛠 Отладка</h3>
+        <button onclick="scannerManager.debugInfo()" class="btn btn-outline">ℹ️ Инфо</button>
+        <button onclick="scannerManager.forceRestoreSession()" class="btn btn-outline">🔄 Восстановить</button>
+    </div>
+    
+    <!-- Временно для тестирования сессии -->
+    <div class="card">
+        <h3>🧪 Тест сессии</h3>
+        <button onclick="scannerManager.createTestSession()" class="btn btn-outline">🔄 Создать тестовую сессию</button>
+        <button onclick="scannerManager.debugSession()" class="btn btn-outline">🐛 Отладка сессии</button>
+    </div>
+
+    <!-- Кнопка показа уведомлений -->
+    <button id="showNotifications" class="notification-bell" onclick="scannerManager.showNotifications()">
+        🔔 <span id="notificationCount" class="notification-badge hidden">0</span>
+    </button>
+
+    <!-- БИБЛИОТЕКИ -->
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bwip-js@2.1.2/dist/bwip-js.min.js"></script>
+
+
+    <!-- Альтернативная библиотека для PDF -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+
+    <!-- НАШИ СКРИПТЫ - ТОЛЬКО ОДИН РАЗ КАЖДЫЙ -->
+    <script src="js/utils.js"></script>
+    <script src="js/app-state.js"></script>
+    <script src="js/pdf-generator.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/scanner.js"></script>
+
+    <!-- Модальное окно управления контрагентами -->
+<div id="contractorManager" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>👥 Управление контрагентами</h3>
+            <button class="btn btn-sm btn-secondary" onclick="scannerManager.hideContractorManager()">
+                ✕ Закрыть
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <!-- Быстрые действия -->
+            <div class="quick-actions">
+                <button class="btn btn-success" onclick="scannerManager.showAddContractorForm()">
+                    ➕ Добавить контрагента
+                </button>
+                <button class="btn btn-outline" onclick="scannerManager.exportContractors()">
+                    📤 Экспорт в CSV
+                </button>
+                <button class="btn btn-outline" onclick="scannerManager.showImportForm()">
+                    📥 Импорт из CSV
+                </button>
+            </div>
+            
+            <!-- Форма добавления контрагента -->
+            <div id="addContractorForm" class="form-section hidden">
+                <h4>Добавить контрагента</h4>
+                <div class="form-group">
+                    <label>Название:</label>
+                    <input type="text" id="contractorName" class="form-select" placeholder="ООО Ромашка">
+                </div>
+                <div class="form-group">
+                    <label>Категория:</label>
+                    <input type="text" id="contractorCategory" class="form-select" placeholder="Оптовый покупатель">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="scannerManager.addContractor()">
+                        ✅ Сохранить
+                    </button>
+                    <button class="btn btn-outline" onclick="scannerManager.hideAddContractorForm()">
+                        ❌ Отмена
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Форма импорта -->
+            <div id="importForm" class="form-section hidden">
+                <h4>Импорт контрагентов</h4>
+                <div class="form-group">
+                    <label>CSV данные (Название,Категория):</label>
+                    <textarea id="importData" class="form-select" rows="6" placeholder="ООО Ромашка,Оптовый покупатель
+ИП Иванов,Розничная сеть
+ООО Луч,Дилер"></textarea>
+                </div>
+                <div class="form-help">
+                    <small>Формат: каждая строка - отдельный контрагент, поля разделены запятыми</small>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="scannerManager.importContractors()">
+                        📥 Импортировать
+                    </button>
+                    <button class="btn btn-outline" onclick="scannerManager.hideImportForm()">
+                        ❌ Отмена
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Список контрагентов -->
+            <div class="contractors-list-section">
+                <h4>Список контрагентов</h4>
+                <div class="search-box">
+                    <input type="text" id="managerSearch" placeholder="🔍 Поиск контрагентов..." class="form-select" 
+                           oninput="scannerManager.filterContractorsList()">
+                </div>
+                <div id="contractorsManagerList" class="contractors-manager-list">
+                    <!-- Список будет здесь -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
