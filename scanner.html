@@ -1023,16 +1023,19 @@
     <script src="js/notifications.js"></script>
     <script src="js/scanner.js"></script>
 
-    <!-- Отладочная панель -->
-    <div id="debugPanel" class="debug-panel">
-        <div><strong>Отладка сканера</strong></div>
-        <div class="debug-info">Статус: <span id="debugStatus">Загрузка...</span></div>
-        <div class="debug-info">Камера: <span id="debugCamera">Проверка...</span></div>
-        <div class="debug-info">Ошибки: <span id="debugError">Нет</span></div>
-        <div>
-            <button class="debug-btn" onclick="scannerManager.debugCamera()">Тест камеры</button>
-            <button class="debug-btn" onclick="scannerManager.forceStartCamera()">Принудительный запуск</button>
-            <button class="debug-btn" onclick="scannerManager.showManualInput()">Ручной ввод</button>
+    <!-- Консоль для мобильных устройств -->
+    <button class="console-toggle" onclick="toggleMobileConsole()">📱</button>
+
+    <div id="mobileConsole" class="mobile-console">
+        <div class="console-header">
+            <span class="console-title">Мобильная консоль</span>
+            <div class="console-controls">
+                <button class="console-btn" onclick="clearConsole()">Очистить</button>
+                <button class="console-btn" onclick="toggleMobileConsole()">✕</button>
+            </div>
+        </div>
+        <div id="consoleContent" class="console-content">
+            <div class="console-log info">Консоль запущена. Готов к работе.</div>
         </div>
     </div>
 </body>
