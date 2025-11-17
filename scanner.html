@@ -1,29 +1,721 @@
 <!DOCTYPE html>
 <html lang="ru">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>QR Сканер</title>
-        <style>
-            body {
-                margin: 0;
-                padding: 20px;
-                font-family: Arial, sans-serif;
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Сканер</title>
+    <style>
+        /* Базовые стили */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Карточки */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #e0e0e0;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        /* Кнопки */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: #545b62;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover:not(:disabled) {
+            background: #1e7e34;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: #bd2130;
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #007bff;
+            color: #007bff;
+        }
+        
+        .btn-outline:hover:not(:disabled) {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .btn-icon {
+            font-size: 16px;
+        }
+        
+        /* Хедер */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: #007bff;
+            text-decoration: none;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        
+        .back-button:hover {
+            text-decoration: underline;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-size: 1.8em;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+        
+        /* Поиск контрагентов */
+        .contractor-search {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        
+        .search-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .form-select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .contractor-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        
+        .contractor-option {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .contractor-option:hover {
+            background: #f8f9fa;
+        }
+        
+        .contractor-option:last-child {
+            border-bottom: none;
+        }
+        
+        /* Выбранные контрагенты */
+        .selected-contractors {
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        
+        .selected-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .contractors-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .contractor-tag {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .remove-contractor {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #f44336;
+            font-size: 14px;
+            padding: 0;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Статистика */
+        .contractor-stats {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .badge {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        /* Статус сессии */
+        .status-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .status-card h3 {
+            color: white;
+        }
+        
+        .status-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .status-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .label {
+            font-weight: 500;
+        }
+        
+        /* Сканирование */
+        .scan-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .scanner-container {
+            width: 100%;
+            min-height: 300px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fafafa;
+        }
+        
+        .scanner-placeholder {
+            text-align: center;
+            color: #7f8c8d;
+        }
+        
+        .placeholder-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        /* Симулятор */
+        .simulator {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+        }
+        
+        .test-codes-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        @media (min-width: 768px) {
+            .test-codes-grid {
+                grid-template-columns: 1fr 1fr;
             }
-            #video {
-                width: 100%;
-                max-width: 400px;
-                border: 2px solid #333;
-                border-radius: 10px;
+        }
+        
+        .test-code {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .test-code:hover {
+            background: #e9ecef;
+            border-color: #007bff;
+        }
+        
+        .code-preview {
+            font-family: monospace;
+            font-size: 11px;
+            color: #495057;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+            margin-right: 10px;
+        }
+        
+        .simulator-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        /* Список кодов */
+        .codes-list {
+            min-height: 100px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #7f8c8d;
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .code-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+        }
+        
+        .code-text {
+            font-family: monospace;
+            font-size: 12px;
+            color: #495057;
+        }
+        
+        .code-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        /* Действия */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        
+        @media (min-width: 768px) {
+            .actions-grid {
+                grid-template-columns: 1fr 1fr;
             }
-            #result {
-                margin-top: 20px;
-                padding: 10px;
-                background: #f0f0f0;
-                border-radius: 5px;
-            }
-        </style>
-    </head>
+        }
+        
+        /* Отчеты */
+        .reports-list {
+            min-height: 100px;
+        }
+        
+        .report-item {
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: white;
+        }
+        
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .report-id {
+            font-family: monospace;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        
+        .report-status {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-completed {
+            background: #d1edff;
+            color: #004085;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .report-info {
+            display: flex;
+            gap: 15px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        /* Уведомления */
+        .notification-bell {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,123,255,0.3);
+            z-index: 1000;
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .notifications-panel {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 400px;
+            max-width: 90vw;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 1001;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .notifications-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #f8f9fa;
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .notifications-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .notification-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+        
+        .notification-title {
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: #2c3e50;
+        }
+        
+        .notification-message {
+            font-size: 13px;
+            color: #7f8c8d;
+            line-height: 1.4;
+        }
+        
+        .notification-time {
+            font-size: 11px;
+            color: #bdc3c7;
+            margin-top: 5px;
+        }
+        
+        /* Модальные окна */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 20px;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #f8f9fa;
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        /* Формы */
+        .form-section {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .form-help {
+            margin-top: 5px;
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+        
+        textarea.form-select {
+            resize: vertical;
+            min-height: 100px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        /* Утилиты */
+        .hidden {
+            display: none !important;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .search-box {
+            margin-bottom: 15px;
+        }
+        
+        .contractors-manager-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        
+        .manager-contractor-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .manager-contractor-item:last-child {
+            border-bottom: none;
+        }
+        
+        .contractor-info h5 {
+            margin: 0 0 5px 0;
+            color: #2c3e50;
+        }
+        
+        .contractor-category {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        
+        .contractor-manager-actions {
+            display: flex;
+            gap: 5px;
+        }
+    </style>
+</head>
 <body>
     <div class="container">
         <header class="header">
@@ -195,26 +887,12 @@
         <div class="card">
             <div class="card-header">
                 <h3>📊 История отчетов</h3>
-                <button id="refreshReports" class="btn btn-sm btn-outline">🔄 Обновить</button>
+                <div>
+                    <button id="deleteAllPending" class="btn btn-sm btn-danger">🗑️ Удалить все необработанные</button>
+                    <button id="refreshReports" class="btn btn-sm btn-outline">🔄 Обновить</button>
+                </div>
             </div>
-        <!-- Статусы отчетов -->
-    <div class="card">
-        <div class="card-header">
-            <h3>📊 История отчетов</h3>
-            <div>
-                <button id="deleteAllPending" class="btn btn-sm btn-danger">🗑️ Удалить все необработанные</button>
-                <button id="refreshReports" class="btn btn-sm btn-outline">🔄 Обновить</button>
-            </div>
-        </div>
-    
-        <div id="reportsList" class="reports-list">
-            <div class="empty-state">
-                <span class="empty-icon">📄</span>
-                <p>Нет отправленных отчетов</p>
-                <small>Созданные отчеты появятся здесь</small>
-            </div>
-        </div>
-    </div>
+        
             <div id="reportsList" class="reports-list">
                 <div class="empty-state">
                     <span class="empty-icon">📄</span>
@@ -227,38 +905,6 @@
     
     <!-- Контейнер для всплывающих уведомлений -->
     <div id="notificationContainer"></div>
-    
-    <h1>QR Сканер</h1>
-    
-    <!-- ОБЯЗАТЕЛЬНО ДОБАВЬТЕ ЭТИ ЭЛЕМЕНТЫ -->
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas" style="display:none;"></canvas>
-    
-    <div id="result">Наведите камеру на QR-код...</div>
-
-    <script>
-        // Базовый код для работы камеры
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const resultDiv = document.getElementById('result');
-
-        // Запуск камеры
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment' } // Используем заднюю камеру
-                });
-                video.srcObject = stream;
-                console.log('Камера запущена!');
-            } catch (err) {
-                console.error('Ошибка камеры:', err);
-                resultDiv.textContent = 'Ошибка доступа к камере: ' + err.message;
-            }
-        }
-
-        // Запускаем при загрузке страницы
-        startCamera();
-    </script>
 
     <!-- Панель уведомлений от бухгалтерии -->
     <div id="warehouseNotifications" class="notifications-panel hidden">
@@ -271,24 +917,92 @@
         </div>
     </div>
 
-    <!-- Добавьте временно для отладки -->
-    <div class="card">
-        <h3>🛠 Отладка</h3>
-        <button onclick="scannerManager.debugInfo()" class="btn btn-outline">ℹ️ Инфо</button>
-        <button onclick="scannerManager.forceRestoreSession()" class="btn btn-outline">🔄 Восстановить</button>
-    </div>
-    
-    <!-- Временно для тестирования сессии -->
-    <div class="card">
-        <h3>🧪 Тест сессии</h3>
-        <button onclick="scannerManager.createTestSession()" class="btn btn-outline">🔄 Создать тестовую сессию</button>
-        <button onclick="scannerManager.debugSession()" class="btn btn-outline">🐛 Отладка сессии</button>
-    </div>
-
     <!-- Кнопка показа уведомлений -->
     <button id="showNotifications" class="notification-bell" onclick="scannerManager.showNotifications()">
         🔔 <span id="notificationCount" class="notification-badge hidden">0</span>
     </button>
+
+    <!-- Модальное окно управления контрагентами -->
+    <div id="contractorManager" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>👥 Управление контрагентами</h3>
+                <button class="btn btn-sm btn-secondary" onclick="scannerManager.hideContractorManager()">
+                    ✕ Закрыть
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Быстрые действия -->
+                <div class="quick-actions">
+                    <button class="btn btn-success" onclick="scannerManager.showAddContractorForm()">
+                        ➕ Добавить контрагента
+                    </button>
+                    <button class="btn btn-outline" onclick="scannerManager.exportContractors()">
+                        📤 Экспорт в CSV
+                    </button>
+                    <button class="btn btn-outline" onclick="scannerManager.showImportForm()">
+                        📥 Импорт из CSV
+                    </button>
+                </div>
+                
+                <!-- Форма добавления контрагента -->
+                <div id="addContractorForm" class="form-section hidden">
+                    <h4>Добавить контрагента</h4>
+                    <div class="form-group">
+                        <label>Название:</label>
+                        <input type="text" id="contractorName" class="form-select" placeholder="ООО Ромашка">
+                    </div>
+                    <div class="form-group">
+                        <label>Категория:</label>
+                        <input type="text" id="contractorCategory" class="form-select" placeholder="Оптовый покупатель">
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" onclick="scannerManager.addContractor()">
+                            ✅ Сохранить
+                        </button>
+                        <button class="btn btn-outline" onclick="scannerManager.hideAddContractorForm()">
+                            ❌ Отмена
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Форма импорта -->
+                <div id="importForm" class="form-section hidden">
+                    <h4>Импорт контрагентов</h4>
+                    <div class="form-group">
+                        <label>CSV данные (Название,Категория):</label>
+                        <textarea id="importData" class="form-select" rows="6" placeholder="ООО Ромашка,Оптовый покупатель
+    ИП Иванов,Розничная сеть
+    ООО Луч,Дилер"></textarea>
+                    </div>
+                    <div class="form-help">
+                        <small>Формат: каждая строка - отдельный контрагент, поля разделены запятыми</small>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" onclick="scannerManager.importContractors()">
+                            📥 Импортировать
+                        </button>
+                        <button class="btn btn-outline" onclick="scannerManager.hideImportForm()">
+                            ❌ Отмена
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Список контрагентов -->
+                <div class="contractors-list-section">
+                    <h4>Список контрагентов</h4>
+                    <div class="search-box">
+                        <input type="text" id="managerSearch" placeholder="🔍 Поиск контрагентов..." class="form-select" 
+                               oninput="scannerManager.filterContractorsList()">
+                    </div>
+                    <div id="contractorsManagerList" class="contractors-manager-list">
+                        <!-- Список будет здесь -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- БИБЛИОТЕКИ -->
     <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -298,98 +1012,23 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bwip-js@2.1.2/dist/bwip-js.min.js"></script>
 
-
     <!-- Альтернативная библиотека для PDF -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
 
-    <!-- НАШИ СКРИПТЫ - ТОЛЬКО ОДИН РАЗ КАЖДЫЙ -->
+    <!-- НАШИ СКРИПТЫ -->
     <script src="js/utils.js"></script>
     <script src="js/app-state.js"></script>
     <script src="js/pdf-generator.js"></script>
     <script src="js/notifications.js"></script>
     <script src="js/scanner.js"></script>
 
-    <!-- Модальное окно управления контрагентами -->
-<div id="contractorManager" class="modal-overlay hidden">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>👥 Управление контрагентами</h3>
-            <button class="btn btn-sm btn-secondary" onclick="scannerManager.hideContractorManager()">
-                ✕ Закрыть
-            </button>
-        </div>
-        
-        <div class="modal-body">
-            <!-- Быстрые действия -->
-            <div class="quick-actions">
-                <button class="btn btn-success" onclick="scannerManager.showAddContractorForm()">
-                    ➕ Добавить контрагента
-                </button>
-                <button class="btn btn-outline" onclick="scannerManager.exportContractors()">
-                    📤 Экспорт в CSV
-                </button>
-                <button class="btn btn-outline" onclick="scannerManager.showImportForm()">
-                    📥 Импорт из CSV
-                </button>
-            </div>
-            
-            <!-- Форма добавления контрагента -->
-            <div id="addContractorForm" class="form-section hidden">
-                <h4>Добавить контрагента</h4>
-                <div class="form-group">
-                    <label>Название:</label>
-                    <input type="text" id="contractorName" class="form-select" placeholder="ООО Ромашка">
-                </div>
-                <div class="form-group">
-                    <label>Категория:</label>
-                    <input type="text" id="contractorCategory" class="form-select" placeholder="Оптовый покупатель">
-                </div>
-                <div class="form-actions">
-                    <button class="btn btn-primary" onclick="scannerManager.addContractor()">
-                        ✅ Сохранить
-                    </button>
-                    <button class="btn btn-outline" onclick="scannerManager.hideAddContractorForm()">
-                        ❌ Отмена
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Форма импорта -->
-            <div id="importForm" class="form-section hidden">
-                <h4>Импорт контрагентов</h4>
-                <div class="form-group">
-                    <label>CSV данные (Название,Категория):</label>
-                    <textarea id="importData" class="form-select" rows="6" placeholder="ООО Ромашка,Оптовый покупатель
-ИП Иванов,Розничная сеть
-ООО Луч,Дилер"></textarea>
-                </div>
-                <div class="form-help">
-                    <small>Формат: каждая строка - отдельный контрагент, поля разделены запятыми</small>
-                </div>
-                <div class="form-actions">
-                    <button class="btn btn-primary" onclick="scannerManager.importContractors()">
-                        📥 Импортировать
-                    </button>
-                    <button class="btn btn-outline" onclick="scannerManager.hideImportForm()">
-                        ❌ Отмена
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Список контрагентов -->
-            <div class="contractors-list-section">
-                <h4>Список контрагентов</h4>
-                <div class="search-box">
-                    <input type="text" id="managerSearch" placeholder="🔍 Поиск контрагентов..." class="form-select" 
-                           oninput="scannerManager.filterContractorsList()">
-                </div>
-                <div id="contractorsManagerList" class="contractors-manager-list">
-                    <!-- Список будет здесь -->
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+    <script>
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.scannerManager) {
+                scannerManager.init();
+            }
+        });
+    </script>
 </body>
 </html>
