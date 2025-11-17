@@ -987,15 +987,20 @@ class ScannerManager {
 
     async startCamera() {
         console.log('📷 Запускаем камеру...');
+        this.updateDebugInfo('status', 'Запуск камеры...');
+        this.updateDebugInfo('error', 'Нет');
         
         if (this.isScanning) {
             console.log('⚠️ Камера уже запущена');
+            this.updateDebugInfo('status', 'Камера уже запущена');
             return;
         }
     
         // Проверяем выбранных контрагентов
         if (!this.selectedContractors || this.selectedContractors.length === 0) {
-            showError('Сначала выберите контрагентов');
+            const errorMsg = 'Сначала выберите контрагентов';
+            showError(errorMsg);
+            this.updateDebugInfo('error', errorMsg);
             return;
         }
     
@@ -1014,7 +1019,7 @@ class ScannerManager {
                 <div style="text-align: center; padding: 40px; color: #666; background: black; border-radius: 12px; height: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
                     <div style="font-size: 48px; margin-bottom: 15px;">📷</div>
                     <p style="color: white; font-size: 18px;">Запуск камеры...</p>
-                    <p style="color: #ccc; margin-top: 10px;">Пожалуйста, подождите</p>
+                    <p style="color: #ccc; margin-top: 10px;" id="cameraStatus">Поиск камеры</p>
                 </div>
             `;
     
@@ -1022,24 +1027,29 @@ class ScannerManager {
             await this.stopCamera();
     
             console.log('🎯 Инициализируем Html5Qrcode...');
+            this.updateDebugInfo('status', 'Инициализация сканера...');
     
             // Создаем сканер
             this.scanner = new Html5Qrcode("reader");
             
-            // УПРОЩЕННАЯ КОНФИГУРАЦИЯ - минимум параметров
+            // УПРОЩЕННАЯ КОНФИГУРАЦИЯ
             const config = {
                 fps: 10,
                 qrbox: { width: 250, height: 250 }
             };
     
             console.log('🔍 Пытаемся найти камеру...');
+            this.updateDebugInfo('camera', 'Поиск камеры...');
     
-            // ПРОБУЕМ РАЗНЫЕ ВАРИАНТЫ ЗАПУСКА КАМЕРЫ
             let success = false;
+            let lastError = '';
             
+            // Вариант 1: Простой запуск без специфичных параметров
             try {
-                // Вариант 1: Запуск с environment (задняя камера)
-                console.log('🎯 Пробуем заднюю камеру...');
+                console.log('🎯 Пробуем простой запуск...');
+                this.updateDebugInfo('status', 'Попытка 1: Простой запуск');
+                this.updateCameraStatus('Попытка 1: Простой запуск');
+                
                 await this.scanner.start(
                     { facingMode: "environment" },
                     config,
@@ -1052,14 +1062,21 @@ class ScannerManager {
                     }
                 );
                 success = true;
-                console.log('✅ Задняя камера запущена');
+                console.log('✅ Камера запущена успешно');
+                this.updateDebugInfo('camera', 'Задняя камера');
+                this.updateDebugInfo('status', 'Камера работает');
                 
-            } catch (error1) {
-                console.log('❌ Задняя камера не доступна:', error1.message);
+            } catch (error) {
+                lastError = error.message;
+                console.log('❌ Простой запуск не сработал:', error.message);
+                this.updateDebugInfo('error', error.message);
                 
+                // Вариант 2: Пробуем переднюю камеру
                 try {
-                    // Вариант 2: Запуск с user (передняя камера)
                     console.log('🎯 Пробуем переднюю камеру...');
+                    this.updateDebugInfo('status', 'Попытка 2: Передняя камера');
+                    this.updateCameraStatus('Попытка 2: Передняя камера');
+                    
                     await this.scanner.start(
                         { facingMode: "user" },
                         config,
@@ -1073,21 +1090,32 @@ class ScannerManager {
                     );
                     success = true;
                     console.log('✅ Передняя камера запущена');
+                    this.updateDebugInfo('camera', 'Передняя камера');
+                    this.updateDebugInfo('status', 'Камера работает');
                     
                 } catch (error2) {
+                    lastError = error2.message;
                     console.log('❌ Передняя камера не доступна:', error2.message);
+                    this.updateDebugInfo('error', error2.message);
                     
+                    // Вариант 3: Получаем список камер и пробуем первую
                     try {
-                        // Вариант 3: Автоматический выбор камеры
-                        console.log('🎯 Пробуем автоматический выбор камеры...');
+                        console.log('🎯 Получаем список камер...');
+                        this.updateDebugInfo('status', 'Получение списка камер');
+                        this.updateCameraStatus('Поиск доступных камер...');
+                        
                         const cameras = await Html5Qrcode.getCameras();
                         console.log('📸 Найдены камеры:', cameras);
+                        this.updateDebugInfo('camera', `Найдено: ${cameras.length} камер`);
                         
                         if (cameras.length === 0) {
-                            throw new Error('Камеры не найдены');
+                            throw new Error('Камеры не найдены на устройстве');
                         }
                         
-                        // Используем первую доступную камеру
+                        console.log('🎯 Пробуем камеру:', cameras[0].label);
+                        this.updateDebugInfo('status', `Запуск: ${cameras[0].label}`);
+                        this.updateCameraStatus(`Запуск: ${cameras[0].label}`);
+                        
                         await this.scanner.start(
                             cameras[0].id,
                             config,
@@ -1101,10 +1129,14 @@ class ScannerManager {
                         );
                         success = true;
                         console.log('✅ Камера запущена по ID');
+                        this.updateDebugInfo('camera', cameras[0].label);
+                        this.updateDebugInfo('status', 'Камера работает');
                         
                     } catch (error3) {
+                        lastError = error3.message;
                         console.log('❌ Все варианты не сработали:', error3.message);
-                        throw new Error('Не удалось запустить ни одну камеру');
+                        this.updateDebugInfo('error', error3.message);
+                        throw new Error(`Не удалось запустить камеру: ${error3.message}`);
                     }
                 }
             }
@@ -1117,11 +1149,15 @@ class ScannerManager {
                 if (stopBtn) stopBtn.classList.remove('hidden');
     
                 console.log('✅ Камера запущена успешно');
+                this.updateDebugInfo('status', 'Камера работает ✅');
+                this.updateCameraStatus('Камера запущена - наведите на QR-код');
                 showSuccess('Камера запущена. Наведите на QR-код', 3000);
             }
     
         } catch (error) {
-            console.error('❌ Ошибка запуска камеры:', error);
+            console.error('❌ Финальная ошибка запуска камеры:', error);
+            this.updateDebugInfo('status', 'Ошибка запуска ❌');
+            this.updateDebugInfo('error', error.message);
             
             let message = 'Не удалось запустить камеру';
             if (error.message.includes('NotAllowedError')) {
@@ -1142,12 +1178,18 @@ class ScannerManager {
                         <div style="font-size: 48px; margin-bottom: 15px;">📷</div>
                         <h4>Камера недоступна</h4>
                         <p>${message}</p>
+                        <div style="color: #666; font-size: 12px; margin: 10px 0;">
+                            Ошибка: ${error.message}
+                        </div>
                         <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
                             <button class="btn btn-primary" onclick="scannerManager.showManualInput()">
                                 ✍️ Ввести код вручную
                             </button>
                             <button class="btn btn-outline" onclick="scannerManager.toggleSimulator()">
                                 🧪 Тестовые коды
+                            </button>
+                            <button class="btn btn-outline" onclick="scannerManager.debugCamera()">
+                                🐛 Отладка камеры
                             </button>
                         </div>
                     </div>
