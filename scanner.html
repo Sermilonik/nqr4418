@@ -1023,5 +1023,17 @@
     <script src="js/notifications.js"></script>
     <script src="js/scanner.js"></script>
 
+    <!-- Отладочная панель -->
+    <div id="debugPanel" class="debug-panel">
+        <div><strong>Отладка сканера</strong></div>
+        <div class="debug-info">Статус: <span id="debugStatus">Загрузка...</span></div>
+        <div class="debug-info">Камера: <span id="debugCamera">Проверка...</span></div>
+        <div class="debug-info">Ошибки: <span id="debugError">Нет</span></div>
+        <div>
+            <button class="debug-btn" onclick="scannerManager.debugCamera()">Тест камеры</button>
+            <button class="debug-btn" onclick="scannerManager.forceStartCamera()">Принудительный запуск</button>
+            <button class="debug-btn" onclick="scannerManager.showManualInput()">Ручной ввод</button>
+        </div>
+    </div>
 </body>
 </html>
