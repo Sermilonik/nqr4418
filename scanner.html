@@ -1023,67 +1023,154 @@
     <script src="js/scanner.js"></script>
 
     <script>
-        // Улучшенный сканер с фиксами для мобильных устройств
-        class MobileQRScanner {
+        // Надежный сканер с проверкой поддержки камеры
+        class ReliableScanner {
             constructor() {
-                this.videoElement = null;
-                this.canvasElement = null;
                 this.isScanning = false;
                 this.stream = null;
-                this.cameraRequested = false; // Защита от дублирующихся запросов
+                this.video = null;
+                this.supportsCamera = false;
             }
     
             init() {
-                console.log('🚀 Инициализация MobileQRScanner');
-                this.fixMobileStyles();
+                console.log('🎯 Инициализация ReliableScanner');
+                this.checkCameraSupport();
+                this.applyMobileFixes();
                 this.bindEvents();
-                this.setupBasicUI();
+                this.setupUI();
             }
     
-            fixMobileStyles() {
-                // Фиксим скроллинг для мобильных устройств
+            checkCameraSupport() {
+                // Проверяем поддержку mediaDevices
+                this.supportsCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+                
+                console.log('📱 Поддержка камеры:', this.supportsCamera);
+                
+                if (!this.supportsCamera) {
+                    console.warn('⚠️ Камера не поддерживается в этом браузере');
+                    this.showNotification('Ваш браузер не поддерживает камеру', 'error');
+                }
+            }
+    
+            applyMobileFixes() {
                 const style = document.createElement('style');
                 style.textContent = `
-                    /* Фикс скроллинга для мобильных */
+                    /* ФИКС СКРОЛЛИНГА */
                     .contractor-dropdown {
-                        max-height: 200px;
-                        overflow-y: auto;
-                        -webkit-overflow-scrolling: touch !important; /* Важно для iOS */
-                        overscroll-behavior: contain;
+                        max-height: 200px !important;
+                        overflow-y: auto !important;
+                        -webkit-overflow-scrolling: touch !important;
+                        overscroll-behavior: contain !important;
                     }
-                    
-                    /* Фикс для телеграма */
-                    .scanner-view {
+    
+                    /* Стили для сканера */
+                    .scanner-container {
                         position: relative;
                         width: 100%;
-                        height: 60vh !important;
-                        min-height: 400px;
-                        max-height: 500px;
+                        height: 400px;
+                        background: #000;
+                        border-radius: 12px;
+                        overflow: hidden;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
                     }
-                    
-                    /* Улучшаем отзывчивость */
+    
+                    .scanner-video {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                    }
+    
+                    .scan-frame {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        pointer-events: none;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                    }
+    
+                    .frame-area {
+                        width: 250px;
+                        height: 250px;
+                        border: 2px solid rgba(255,255,255,0.5);
+                        border-radius: 12px;
+                        position: relative;
+                    }
+    
+                    .frame-corner {
+                        position: absolute;
+                        width: 20px;
+                        height: 20px;
+                        border: 3px solid #00ff00;
+                    }
+    
+                    .frame-corner.top-left {
+                        top: -3px;
+                        left: -3px;
+                        border-right: none;
+                        border-bottom: none;
+                    }
+    
+                    .frame-corner.top-right {
+                        top: -3px;
+                        right: -3px;
+                        border-left: none;
+                        border-bottom: none;
+                    }
+    
+                    .frame-corner.bottom-left {
+                        bottom: -3px;
+                        left: -3px;
+                        border-right: none;
+                        border-top: none;
+                    }
+    
+                    .frame-corner.bottom-right {
+                        bottom: -3px;
+                        right: -3px;
+                        border-left: none;
+                        border-top: none;
+                    }
+    
+                    .scan-line {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 2px;
+                        background: #00ff00;
+                        animation: scan 2s ease-in-out infinite;
+                    }
+    
+                    @keyframes scan {
+                        0% { top: 0; }
+                        100% { top: 100%; }
+                    }
+    
+                    .scan-instruction {
+                        color: white;
+                        margin-top: 20px;
+                        text-align: center;
+                        font-weight: bold;
+                        text-shadow: 1px 1px 2px black;
+                    }
+    
+                    /* Адаптивность */
                     @media (max-width: 768px) {
-                        .container {
-                            padding: 10px;
+                        .scanner-container {
+                            height: 300px;
                         }
                         
-                        .card {
-                            padding: 15px;
+                        .frame-area {
+                            width: 200px;
+                            height: 200px;
                         }
-                        
-                        .scan-controls {
-                            flex-direction: column;
-                        }
-                        
-                        .btn {
-                            width: 100%;
-                            justify-content: center;
-                        }
-                    }
-                    
-                    /* Предотвращаем масштабирование при фокусе */
-                    .form-select {
-                        font-size: 16px !important; /* Фикс для iOS zoom */
                     }
                 `;
                 document.head.appendChild(style);
@@ -1096,7 +1183,6 @@
     
                 if (startBtn) {
                     startBtn.addEventListener('click', () => this.startCamera());
-                    startBtn.disabled = false;
                 }
     
                 if (stopBtn) {
@@ -1107,290 +1193,165 @@
                     simulatorBtn.addEventListener('click', () => this.toggleSimulator());
                 }
     
-                // Фикс скроллинга для выпадающего списка
-                this.fixContractorDropdown();
+                // Фикс скроллинга при загрузке
+                setTimeout(() => this.fixDropdownScrolling(), 100);
             }
     
-            fixContractorDropdown() {
-                const searchInput = document.getElementById('contractorSearch');
-                if (searchInput) {
-                    searchInput.addEventListener('focus', () => {
-                        // Даем время на отображение dropdown перед фиксом скроллинга
-                        setTimeout(() => {
-                            const dropdown = document.getElementById('contractorDropdown');
-                            if (dropdown) {
-                                dropdown.style.webkitOverflowScrolling = 'touch';
-                                dropdown.style.overflowY = 'auto';
-                            }
-                        }, 100);
-                    });
+            fixDropdownScrolling() {
+                const dropdown = document.getElementById('contractorDropdown');
+                if (dropdown) {
+                    dropdown.style.webkitOverflowScrolling = 'touch';
+                    dropdown.style.overflowY = 'auto';
                 }
             }
     
             async startCamera() {
-                console.log('📷 Запуск камеры...');
+                console.log('📷 Пытаемся запустить камеру...');
                 
-                // Защита от повторных запросов
-                if (this.cameraRequested) {
-                    console.log('⚠️ Запрос камеры уже выполняется');
-                    return;
-                }
-    
                 if (this.isScanning) {
                     console.log('⚠️ Камера уже запущена');
                     return;
                 }
     
-                this.cameraRequested = true;
+                // Проверяем поддержку камеры
+                if (!this.supportsCamera) {
+                    this.showNotification('Камера не поддерживается в вашем браузере', 'error');
+                    this.showFallbackOptions();
+                    return;
+                }
     
                 try {
-                    // Показываем контейнер сканера
+                    // Показываем UI
                     const reader = document.getElementById('reader');
                     const startBtn = document.getElementById('startCamera');
                     const stopBtn = document.getElementById('stopCamera');
     
                     if (reader) {
                         reader.classList.remove('hidden');
-                        reader.innerHTML = '<div class="scanner-placeholder"><span class="placeholder-icon">📷</span><p>Запуск камеры...</p></div>';
+                        reader.innerHTML = `
+                            <div class="scanner-container">
+                                <div class="scanner-placeholder">
+                                    <span class="placeholder-icon">📷</span>
+                                    <p>Запуск камеры...</p>
+                                    <p class="loading-text">Пожалуйста, подождите</p>
+                                </div>
+                            </div>
+                        `;
                     }
     
-                    // Останавливаем предыдущие потоки
-                    if (this.stream) {
-                        this.stopCamera();
-                        await this.delay(500); // Даем время на остановку
-                    }
+                    // Останавливаем предыдущую камеру
+                    await this.stopCamera();
+                    await this.delay(200);
     
                     console.log('🔍 Запрашиваем доступ к камере...');
     
-                    // Опции камеры для мобильных устройств
+                    // Безопасный запрос камеры
                     const constraints = {
                         video: {
                             facingMode: 'environment',
                             width: { ideal: 1280 },
-                            height: { ideal: 720 },
-                            frameRate: { ideal: 30 }
+                            height: { ideal: 720 }
                         },
                         audio: false
                     };
     
-                    // Единый запрос камеры
                     this.stream = await navigator.mediaDevices.getUserMedia(constraints);
                     console.log('✅ Доступ к камере получен');
     
-                    // Создаем видео элемент если его нет
-                    if (!this.videoElement) {
-                        this.videoElement = document.createElement('video');
-                        this.videoElement.id = 'qrVideo';
-                        this.videoElement.playsInline = true;
-                        this.videoElement.muted = true;
-                        this.videoElement.style.display = 'none';
-                        document.body.appendChild(this.videoElement);
+                    // Создаем видео элемент
+                    this.video = document.createElement('video');
+                    this.video.className = 'scanner-video';
+                    this.video.playsInline = true;
+                    this.video.muted = true;
+                    this.video.srcObject = this.stream;
+    
+                    // Заменяем плейсхолдер на видео
+                    if (reader) {
+                        const container = reader.querySelector('.scanner-container');
+                        if (container) {
+                            const placeholder = container.querySelector('.scanner-placeholder');
+                            if (placeholder) placeholder.remove();
+                            container.appendChild(this.video);
+                        }
                     }
     
-                    // Настраиваем видео
-                    this.videoElement.srcObject = this.stream;
-                    
                     // Ждем готовности видео
                     await new Promise((resolve, reject) => {
-                        this.videoElement.onloadedmetadata = () => {
-                            console.log('🎬 Метаданные видео загружены');
-                            this.videoElement.play()
-                                .then(resolve)
-                                .catch(reject);
+                        const onReady = () => {
+                            this.video.removeEventListener('loadeddata', onReady);
+                            this.video.removeEventListener('error', onError);
+                            console.log('🎬 Видео готово к воспроизведению');
+                            this.video.play().then(resolve).catch(reject);
                         };
-                        
-                        this.videoElement.onerror = reject;
-                        
-                        // Таймаут на случай если видео не загрузится
-                        setTimeout(() => reject(new Error('Таймаут загрузки видео')), 5000);
+    
+                        const onError = (err) => {
+                            this.video.removeEventListener('loadeddata', onReady);
+                            this.video.removeEventListener('error', onError);
+                            reject(err);
+                        };
+    
+                        this.video.addEventListener('loadeddata', onReady);
+                        this.video.addEventListener('error', onError);
+    
+                        // Таймаут
+                        setTimeout(() => {
+                            this.video.removeEventListener('loadeddata', onReady);
+                            this.video.removeEventListener('error', onError);
+                            reject(new Error('Таймаут загрузки видео'));
+                        }, 10000);
                     });
     
-                    console.log('✅ Видео запущено');
+                    // Добавляем рамку сканирования
+                    this.addScanningFrame();
     
-                    // Создаем интерфейс сканирования
-                    this.createScannerInterface();
-                    
                     // Обновляем UI
                     if (startBtn) startBtn.classList.add('hidden');
                     if (stopBtn) stopBtn.classList.remove('hidden');
     
                     this.isScanning = true;
-                    console.log('✅ Камера запущена успешно');
-    
+                    
+                    console.log('✅ Камера успешно запущена!');
                     this.showNotification('Камера запущена. Наведите на QR-код', 'success');
     
                 } catch (error) {
-                    console.error('❌ Ошибка камеры:', error);
+                    console.error('❌ Ошибка при запуске камеры:', error);
                     this.handleCameraError(error);
-                } finally {
-                    this.cameraRequested = false;
                 }
             }
     
-            createScannerInterface() {
-                const reader = document.getElementById('reader');
-                if (!reader) return;
+            addScanningFrame() {
+                const container = document.querySelector('.scanner-container');
+                if (!container) return;
     
-                reader.innerHTML = `
-                    <div class="scanner-view">
-                        <div class="scanner-frame">
-                            <div class="frame-corner top-left"></div>
-                            <div class="frame-corner top-right"></div>
-                            <div class="frame-corner bottom-left"></div>
-                            <div class="frame-corner bottom-right"></div>
-                            <div class="scan-line"></div>
-                        </div>
-                        <div class="scanner-instruction">
-                            📱 Наведите камеру на QR-код
-                        </div>
-                        <div class="scanner-fallback">
-                            <button class="btn btn-outline" onclick="window.mobileScanner.showManualInput()">
-                                ✍️ Ввести код вручную
-                            </button>
-                            <button class="btn btn-outline" onclick="window.mobileScanner.toggleSimulator()">
-                                🧪 Тестовые коды
-                            </button>
-                        </div>
+                const frame = document.createElement('div');
+                frame.className = 'scan-frame';
+                frame.innerHTML = `
+                    <div class="frame-area">
+                        <div class="frame-corner top-left"></div>
+                        <div class="frame-corner top-right"></div>
+                        <div class="frame-corner bottom-left"></div>
+                        <div class="frame-corner bottom-right"></div>
+                        <div class="scan-line"></div>
                     </div>
+                    <div class="scan-instruction">Наведите камеру на QR-код</div>
                 `;
-    
-                this.addScannerStyles();
+                container.appendChild(frame);
             }
     
-            addScannerStyles() {
-                if (document.getElementById('mobile-scanner-styles')) return;
-    
-                const styles = `
-                    .scanner-view {
-                        position: relative;
-                        width: 100%;
-                        height: 60vh;
-                        min-height: 400px;
-                        max-height: 500px;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        background: #000;
-                        border-radius: 12px;
-                        overflow: hidden;
-                    }
-                    
-                    .scanner-frame {
-                        position: relative;
-                        width: 250px;
-                        height: 250px;
-                        border: 2px solid #fff;
-                        border-radius: 12px;
-                        margin-bottom: 20px;
-                    }
-                    
-                    .frame-corner {
-                        position: absolute;
-                        width: 20px;
-                        height: 20px;
-                        border: 3px solid #007bff;
-                    }
-                    
-                    .frame-corner.top-left {
-                        top: -3px;
-                        left: -3px;
-                        border-right: none;
-                        border-bottom: none;
-                        border-top-left-radius: 8px;
-                    }
-                    
-                    .frame-corner.top-right {
-                        top: -3px;
-                        right: -3px;
-                        border-left: none;
-                        border-bottom: none;
-                        border-top-right-radius: 8px;
-                    }
-                    
-                    .frame-corner.bottom-left {
-                        bottom: -3px;
-                        left: -3px;
-                        border-right: none;
-                        border-top: none;
-                        border-bottom-left-radius: 8px;
-                    }
-                    
-                    .frame-corner.bottom-right {
-                        bottom: -3px;
-                        right: -3px;
-                        border-left: none;
-                        border-top: none;
-                        border-bottom-right-radius: 8px;
-                    }
-                    
-                    .scan-line {
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        height: 3px;
-                        background: linear-gradient(90deg, transparent, #007bff, transparent);
-                        animation: scan 2s linear infinite;
-                    }
-                    
-                    @keyframes scan {
-                        0% { top: 0; }
-                        50% { top: 100%; }
-                        100% { top: 0; }
-                    }
-                    
-                    .scanner-instruction {
-                        color: white;
-                        margin: 20px 0;
-                        text-align: center;
-                        font-weight: 500;
-                        font-size: 16px;
-                    }
-                    
-                    .scanner-fallback {
-                        display: flex;
-                        gap: 10px;
-                        flex-wrap: wrap;
-                        justify-content: center;
-                    }
-                    
-                    /* Улучшения для мобильных */
-                    @media (max-width: 768px) {
-                        .scanner-view {
-                            height: 50vh !important;
-                            min-height: 300px;
-                        }
-                        
-                        .scanner-frame {
-                            width: 200px;
-                            height: 200px;
-                        }
-                        
-                        .scanner-fallback {
-                            flex-direction: column;
-                            align-items: center;
-                        }
-                        
-                        .scanner-fallback .btn {
-                            width: 200px;
-                        }
-                    }
-                `;
-    
-                const styleSheet = document.createElement('style');
-                styleSheet.id = 'mobile-scanner-styles';
-                styleSheet.textContent = styles;
-                document.head.appendChild(styleSheet);
-            }
-    
-            stopCamera() {
-                console.log('🛑 Остановка камеры...');
+            async stopCamera() {
+                console.log('🛑 Останавливаем камеру...');
                 
                 this.isScanning = false;
-                this.cameraRequested = false;
     
-                // Останавливаем поток камеры
+                // Останавливаем видео
+                if (this.video) {
+                    this.video.pause();
+                    this.video.srcObject = null;
+                    this.video.remove();
+                    this.video = null;
+                }
+    
+                // Останавливаем поток
                 if (this.stream) {
                     this.stream.getTracks().forEach(track => {
                         track.stop();
@@ -1398,119 +1359,76 @@
                     this.stream = null;
                 }
     
-                // Очищаем видео
-                if (this.videoElement) {
-                    this.videoElement.srcObject = null;
-                    this.videoElement.pause();
-                }
-    
                 // Обновляем UI
                 const reader = document.getElementById('reader');
                 const startBtn = document.getElementById('startCamera');
                 const stopBtn = document.getElementById('stopCamera');
     
-                if (reader) {
-                    reader.classList.add('hidden');
-                }
-    
-                if (startBtn) {
-                    startBtn.classList.remove('hidden');
-                    startBtn.disabled = false;
-                }
+                if (reader) reader.classList.add('hidden');
+                if (startBtn) startBtn.classList.remove('hidden');
                 if (stopBtn) stopBtn.classList.add('hidden');
     
-                this.showNotification('Камера выключена', 'info');
-                console.log('✅ Камера остановлена');
+                await this.delay(100);
             }
     
             handleCameraError(error) {
                 console.error('Ошибка камеры:', error);
                 
-                let errorMessage = 'Не удалось получить доступ к камере';
+                let message = 'Не удалось получить доступ к камере';
                 
-                if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-                    errorMessage = 'Камера не найдена';
-                } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-                    errorMessage = 'Доступ к камере запрещен';
+                if (error.name === 'NotAllowedError') {
+                    message = 'Доступ к камере запрещен. Разрешите доступ в настройках браузера.';
+                } else if (error.name === 'NotFoundError') {
+                    message = 'Камера не найдена. Убедитесь, что камера подключена и доступна.';
                 } else if (error.name === 'NotSupportedError') {
-                    errorMessage = 'Браузер не поддерживает камеру';
-                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-                    errorMessage = 'Камера используется другим приложением';
+                    message = 'Ваш браузер не поддерживает доступ к камере.';
+                } else if (error.name === 'NotReadableError') {
+                    message = 'Камера уже используется другим приложением.';
+                } else if (error.message.includes('Таймаут')) {
+                    message = 'Камера не ответила. Попробуйте еще раз.';
                 }
     
-                this.showNotification(errorMessage, 'error');
+                this.showNotification(message, 'error');
                 this.showFallbackOptions();
             }
     
             showFallbackOptions() {
                 const reader = document.getElementById('reader');
-                if (!reader) return;
-    
-                reader.innerHTML = `
-                    <div class="scanner-fallback-options">
-                        <div class="fallback-header">
-                            <span class="fallback-icon">📷</span>
-                            <h4>Не удалось запустить камеру</h4>
+                if (reader) {
+                    reader.innerHTML = `
+                        <div class="scanner-fallback">
+                            <div class="fallback-header">
+                                <span class="fallback-icon">📷</span>
+                                <h4>Камера недоступна</h4>
+                            </div>
+                            <div class="fallback-content">
+                                <p>Используйте альтернативные способы добавления кодов:</p>
+                                <div class="fallback-buttons">
+                                    <button class="btn btn-primary" onclick="window.reliableScanner.showManualInput()">
+                                        ✍️ Ввести код вручную
+                                    </button>
+                                    <button class="btn btn-outline" onclick="window.reliableScanner.toggleSimulator()">
+                                        🧪 Тестовые коды
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="fallback-actions">
-                            <button class="btn btn-primary" onclick="window.mobileScanner.showManualInput()">
-                                ✍️ Ввести код вручную
-                            </button>
-                            <button class="btn btn-outline" onclick="window.mobileScanner.toggleSimulator()">
-                                🧪 Использовать симулятор
-                            </button>
-                        </div>
-                    </div>
-                `;
-                reader.classList.remove('hidden');
-            }
-    
-            showManualInput() {
-                const modal = document.createElement('div');
-                modal.className = 'manual-input-modal';
-                modal.innerHTML = `
-                    <div class="manual-input-content">
-                        <h3>✍️ Ввод кода вручную</h3>
-                        <div class="form-group">
-                            <input type="text" id="manualCodeInput" class="form-select" 
-                                   placeholder="0104604063405720219NQNfSwVmcTEST001"
-                                   style="font-size: 16px"> <!-- Фикс для iOS -->
-                        </div>
-                        <div class="form-actions">
-                            <button class="btn btn-primary" onclick="window.mobileScanner.submitManualCode()">
-                                ✅ Добавить код
-                            </button>
-                            <button class="btn btn-outline" onclick="this.closest('.manual-input-modal').remove()">
-                                ❌ Отмена
-                            </button>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-    
-                setTimeout(() => {
-                    const input = document.getElementById('manualCodeInput');
-                    if (input) input.focus();
-                }, 100);
-            }
-    
-            submitManualCode() {
-                const input = document.getElementById('manualCodeInput');
-                const modal = document.querySelector('.manual-input-modal');
-                
-                if (input && input.value.trim()) {
-                    this.onScanSuccess(input.value.trim());
-                    if (modal) modal.remove();
-                } else {
-                    this.showNotification('Введите код', 'error');
+                    `;
+                    reader.classList.remove('hidden');
                 }
             }
     
-            onScanSuccess(decodedText) {
-                console.log('✅ Сканирование успешно:', decodedText);
-                
-                this.showNotification(`Добавлен код: ${decodedText}`, 'success');
-                this.addToCodesList(decodedText);
+            showManualInput() {
+                const code = prompt('Введите QR-код вручную:', '0104604063405720219NQNfSwVmcTEST001');
+                if (code && code.trim()) {
+                    this.onScanSuccess(code.trim());
+                }
+            }
+    
+            onScanSuccess(code) {
+                console.log('✅ Код получен:', code);
+                this.showNotification(`Добавлен код: ${code.substring(0, 20)}...`, 'success');
+                this.addToCodesList(code);
                 
                 // Вибрация если доступна
                 if (navigator.vibrate) {
@@ -1535,11 +1453,9 @@
                 codeItem.className = 'code-item';
                 codeItem.innerHTML = `
                     <span class="code-text">${code}</span>
-                    <div class="code-actions">
-                        <button class="btn btn-sm btn-outline" onclick="this.parentElement.parentElement.remove(); window.mobileScanner.updateTotalCodes();">
-                            🗑️
-                        </button>
-                    </div>
+                    <button class="btn btn-sm btn-outline" onclick="this.parentElement.remove(); window.reliableScanner.updateTotalCodes();">
+                        🗑️
+                    </button>
                 `;
                 
                 codesList.appendChild(codeItem);
@@ -1547,17 +1463,13 @@
             }
     
             updateTotalCodes() {
-                const codesList = document.getElementById('codesList');
-                const totalCodes = document.getElementById('totalCodes');
+                const totalEl = document.getElementById('totalCodes');
+                const generateBtn = document.getElementById('generateReport');
                 
-                if (codesList && totalCodes) {
-                    const codeCount = codesList.querySelectorAll('.code-item').length;
-                    totalCodes.textContent = codeCount;
-                    
-                    const generateBtn = document.getElementById('generateReport');
-                    if (generateBtn) {
-                        generateBtn.disabled = codeCount === 0;
-                    }
+                if (totalEl && generateBtn) {
+                    const count = document.querySelectorAll('.code-item').length;
+                    totalEl.textContent = count;
+                    generateBtn.disabled = count === 0;
                 }
             }
     
@@ -1569,58 +1481,45 @@
             }
     
             simulateScan(code) {
-                console.log('🧪 Симуляция сканирования:', code);
                 this.onScanSuccess(code);
             }
     
-            showNotification(message, type = 'info') {
-                const notification = document.createElement('div');
-                notification.className = `notification notification-${type}`;
-                notification.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#007bff'};
-                    color: white;
-                    padding: 12px 20px;
-                    border-radius: 8px;
-                    z-index: 10000;
-                    max-width: 80%;
-                    text-align: center;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                `;
-                notification.textContent = message;
-                
-                document.body.appendChild(notification);
-                
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
-                    }
-                }, 3000);
+            showNotification(message, type) {
+                // Простое уведомление через alert
+                if (type === 'error') {
+                    alert('❌ ' + message);
+                } else {
+                    alert('✅ ' + message);
+                }
             }
     
             delay(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
             }
     
-            setupBasicUI() {
+            setupUI() {
                 const startBtn = document.getElementById('startCamera');
-                if (startBtn) startBtn.disabled = false;
+                if (startBtn) {
+                    startBtn.disabled = !this.supportsCamera;
+                    if (!this.supportsCamera) {
+                        startBtn.title = 'Камера не поддерживается в вашем браузере';
+                    }
+                }
             }
         }
     
-        // Инициализация
+        // Инициализация при загрузке
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('📱 Запускаем MobileQRScanner для телефона');
+            console.log('🚀 Запускаем ReliableScanner');
             
-            window.mobileScanner = new MobileQRScanner();
-            window.mobileScanner.init();
+            window.reliableScanner = new ReliableScanner();
+            window.reliableScanner.init();
     
             // Глобальные функции
-            window.simulateScan = (code) => window.mobileScanner.simulateScan(code);
-            window.toggleSimulator = () => window.mobileScanner.toggleSimulator();
+            window.simulateScan = (code) => window.reliableScanner.simulateScan(code);
+            window.toggleSimulator = () => window.reliableScanner.toggleSimulator();
+            
+            console.log('✅ ReliableScanner инициализирован');
         });
     </script>
 </body>
