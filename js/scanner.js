@@ -981,9 +981,9 @@ class ScannerManager {
         document.getElementById('startCamera').disabled = false;
     }
 
-    // УПРОЩЕННЫЙ ЗАПУСК КАМЕРЫ ДЛЯ МОБИЛЬНЫХ
+    // ЗАПУСК КАМЕРЫ С ПРАВИЛЬНЫМ ОТОБРАЖЕНИЕМ
     async startCamera() {
-        console.log('📷 Запускаем камеру на мобильном...');
+        console.log('📷 Запускаем камеру...');
         
         if (this.isScanning) {
             console.log('⚠️ Камера уже запущена');
@@ -1004,20 +1004,33 @@ class ScannerManager {
             // Останавливаем предыдущую камеру
             await this.stopCamera();
 
+            // ПОЛУЧАЕМ КОНТЕЙНЕР
+            const container = document.getElementById('reader');
+            if (!container) {
+                throw new Error('Контейнер для камеры не найден');
+            }
+
+            // ОЧИЩАЕМ КОНТЕЙНЕР
+            container.innerHTML = '';
+            
             this.scanner = new Html5Qrcode("reader");
             
-            // ПРОСТАЯ КОНФИГУРАЦИЯ ДЛЯ МОБИЛЬНЫХ
+            // КОНФИГУРАЦИЯ ДЛЯ МОБИЛЬНЫХ
             const config = {
                 fps: 10,
                 qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
+                aspectRatio: 1.0,
+                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_QR_CODE]
             };
+
+            console.log('🎯 Пробуем запустить камеру...');
 
             // ПРОБУЕМ РАЗНЫЕ КАМЕРЫ
             let cameraStarted = false;
             
             try {
                 // СНАЧАЛА ПРОБУЕМ ЗАДНЮЮ КАМЕРУ
+                console.log('📸 Пробуем заднюю камеру...');
                 await this.scanner.start(
                     { facingMode: "environment" },
                     config,
@@ -1037,6 +1050,7 @@ class ScannerManager {
                 
                 try {
                     // ПРОБУЕМ ПЕРЕДНЮЮ КАМЕРУ
+                    console.log('📸 Пробуем переднюю камеру...');
                     await this.scanner.start(
                         { facingMode: "user" },
                         config,
@@ -1053,35 +1067,40 @@ class ScannerManager {
                     
                 } catch (error2) {
                     console.log('❌ Передняя камера не доступна:', error2.message);
-                    
-                    // ПОКАЗЫВАЕМ СООБЩЕНИЕ ОБ ОШИБКЕ
-                    let message = 'Не удалось запустить камеру: ' + error2.message;
-                    if (error2.message.includes('NotAllowedError')) {
-                        message = '📷 Разрешите доступ к камере в настройках браузера\n\n1. Нажмите на значок 🔒 в адресной строке\n2. Выберите "Разрешить доступ к камере"\n3. Перезагрузите страницу';
-                    } else if (error2.message.includes('NotFoundError')) {
-                        message = '📷 Камера не найдена на устройстве';
-                    } else if (error2.message.includes('NotSupportedError')) {
-                        message = '📷 Ваш браузер не поддерживает сканирование QR-кодов';
-                    }
-                    
-                    showError(message);
-                    this.showSimulator();
-                    return;
+                    throw error2;
                 }
             }
 
             if (cameraStarted) {
                 this.isScanning = true;
+                
+                // ОБНОВЛЯЕМ ИНТЕРФЕЙС
                 document.getElementById('startCamera').classList.add('hidden');
                 document.getElementById('stopCamera').classList.remove('hidden');
-                document.getElementById('reader').classList.remove('hidden');
                 
+                // СКРЫВАЕМ ПЛЕЙСХОЛДЕР И ПОКАЗЫВАЕМ КАМЕРУ
+                const placeholder = document.querySelector('.scanner-overlay');
+                if (placeholder) {
+                    placeholder.classList.add('hidden');
+                }
+                
+                console.log('🎉 Камера успешно запущена и отображается');
                 showSuccess('📷 Камера запущена! Наведите на QR-код', 3000);
             }
 
         } catch (error) {
-            console.error('❌ Финальная ошибка запуска камеры:', error);
-            showError('📷 Не удалось запустить камеру. Используйте симулятор для тестирования.');
+            console.error('❌ Ошибка запуска камеры:', error);
+            
+            let message = 'Не удалось запустить камеру: ' + error.message;
+            if (error.message.includes('NotAllowedError')) {
+                message = '📷 Разрешите доступ к камере в настройках браузера\n\n1. Нажмите на значок 🔒 в адресной строке\n2. Выберите "Разрешить доступ к камере"\n3. Перезагрузите страницу';
+            } else if (error.message.includes('NotFoundError')) {
+                message = '📷 Камера не найдена на устройстве';
+            } else if (error.message.includes('NotSupportedError')) {
+                message = '📷 Ваш браузер не поддерживает сканирование QR-кодов';
+            }
+            
+            showError(message);
             this.showSimulator();
         }
     }
@@ -1120,38 +1139,43 @@ class ScannerManager {
         }
     }
 
+    // ОСТАНОВКА КАМЕРЫ
     async stopCamera() {
-        console.log('🛑 Останавливаем камеру...');
-        
         if (this.scanner && this.isScanning) {
             try {
                 await this.scanner.stop();
-                this.scanner.clear();
+                await this.scanner.clear();
                 console.log('✅ Камера остановлена');
             } catch (error) {
                 console.warn('⚠️ Ошибка при остановке камеры:', error);
             }
         }
-    
+        
         this.isScanning = false;
         this.scanner = null;
-    
-        // Обновляем UI
-        const reader = document.getElementById('reader');
-        const startBtn = document.getElementById('startCamera');
-        const stopBtn = document.getElementById('stopCamera');
-    
-        if (reader) {
-            reader.classList.add('hidden');
-            reader.innerHTML = ''; // Очищаем контейнер
+        
+        // ОБНОВЛЯЕМ ИНТЕРФЕЙС
+        document.getElementById('startCamera').classList.remove('hidden');
+        document.getElementById('stopCamera').classList.add('hidden');
+        
+        // ПОКАЗЫВАЕМ ПЛЕЙСХОЛДЕР
+        const placeholder = document.querySelector('.scanner-overlay');
+        if (placeholder) {
+            placeholder.classList.remove('hidden');
         }
-    
-        if (startBtn) startBtn.classList.remove('hidden');
-        if (stopBtn) stopBtn.classList.add('hidden');
-    
-        console.log('✅ UI обновлен после остановки камеры');
+        
+        // ОЧИЩАЕМ КОНТЕЙНЕР
+        const container = document.getElementById('reader');
+        if (container) {
+            container.innerHTML = `
+                <div class="scanner-overlay">
+                    <span class="placeholder-icon">📷</span>
+                    <p>Камера запущена. Наведите на QR-код</p>
+                    <div class="scanner-frame"></div>
+                </div>
+            `;
+        }
     }
-
     showManualInput() {
         const code = prompt('Введите QR-код вручную:', '0104604063405720219NQNfSwVmcTEST001');
         if (code && code.trim()) {
