@@ -986,13 +986,10 @@ class ScannerManager {
     }
 
     async startCamera() {
-        console.log('📷 Запускаем камеру...');
-        this.updateDebugInfo('status', 'Запуск камеры...');
-        this.updateDebugInfo('error', 'Нет');
+        window.mobileConsole.info('📷 Запускаем камеру...');
         
         if (this.isScanning) {
-            console.log('⚠️ Камера уже запущена');
-            this.updateDebugInfo('status', 'Камера уже запущена');
+            window.mobileConsole.warn('⚠️ Камера уже запущена');
             return;
         }
     
@@ -1000,7 +997,7 @@ class ScannerManager {
         if (!this.selectedContractors || this.selectedContractors.length === 0) {
             const errorMsg = 'Сначала выберите контрагентов';
             showError(errorMsg);
-            this.updateDebugInfo('error', errorMsg);
+            window.mobileConsole.error(errorMsg);
             return;
         }
     
@@ -1026,8 +1023,7 @@ class ScannerManager {
             // Останавливаем предыдущую камеру
             await this.stopCamera();
     
-            console.log('🎯 Инициализируем Html5Qrcode...');
-            this.updateDebugInfo('status', 'Инициализация сканера...');
+            window.mobileConsole.info('🎯 Инициализируем Html5Qrcode...');
     
             // Создаем сканер
             this.scanner = new Html5Qrcode("reader");
@@ -1038,23 +1034,19 @@ class ScannerManager {
                 qrbox: { width: 250, height: 250 }
             };
     
-            console.log('🔍 Пытаемся найти камеру...');
-            this.updateDebugInfo('camera', 'Поиск камеры...');
+            window.mobileConsole.info('🔍 Пытаемся найти камеру...');
     
             let success = false;
-            let lastError = '';
             
-            // Вариант 1: Простой запуск без специфичных параметров
+            // Вариант 1: Простой запуск
             try {
-                console.log('🎯 Пробуем простой запуск...');
-                this.updateDebugInfo('status', 'Попытка 1: Простой запуск');
-                this.updateCameraStatus('Попытка 1: Простой запуск');
+                window.mobileConsole.info('🎯 Пробуем заднюю камеру (environment)...');
                 
                 await this.scanner.start(
                     { facingMode: "environment" },
                     config,
                     (decodedText) => {
-                        console.log('✅ QR-код распознан:', decodedText);
+                        window.mobileConsole.info(`✅ QR-код распознан: ${decodedText}`);
                         this.onScanSuccess(decodedText);
                     },
                     (errorMessage) => {
@@ -1062,26 +1054,20 @@ class ScannerManager {
                     }
                 );
                 success = true;
-                console.log('✅ Камера запущена успешно');
-                this.updateDebugInfo('camera', 'Задняя камера');
-                this.updateDebugInfo('status', 'Камера работает');
+                window.mobileConsole.info('✅ Задняя камера запущена успешно');
                 
             } catch (error) {
-                lastError = error.message;
-                console.log('❌ Простой запуск не сработал:', error.message);
-                this.updateDebugInfo('error', error.message);
+                window.mobileConsole.warn(`❌ Задняя камера не доступна: ${error.message}`);
                 
-                // Вариант 2: Пробуем переднюю камеру
+                // Вариант 2: Передняя камера
                 try {
-                    console.log('🎯 Пробуем переднюю камеру...');
-                    this.updateDebugInfo('status', 'Попытка 2: Передняя камера');
-                    this.updateCameraStatus('Попытка 2: Передняя камера');
+                    window.mobileConsole.info('🎯 Пробуем переднюю камеру (user)...');
                     
                     await this.scanner.start(
                         { facingMode: "user" },
                         config,
                         (decodedText) => {
-                            console.log('✅ QR-код распознан:', decodedText);
+                            window.mobileConsole.info(`✅ QR-код распознан: ${decodedText}`);
                             this.onScanSuccess(decodedText);
                         },
                         (errorMessage) => {
@@ -1089,38 +1075,29 @@ class ScannerManager {
                         }
                     );
                     success = true;
-                    console.log('✅ Передняя камера запущена');
-                    this.updateDebugInfo('camera', 'Передняя камера');
-                    this.updateDebugInfo('status', 'Камера работает');
+                    window.mobileConsole.info('✅ Передняя камера запущена успешно');
                     
                 } catch (error2) {
-                    lastError = error2.message;
-                    console.log('❌ Передняя камера не доступна:', error2.message);
-                    this.updateDebugInfo('error', error2.message);
+                    window.mobileConsole.warn(`❌ Передняя камера не доступна: ${error2.message}`);
                     
-                    // Вариант 3: Получаем список камер и пробуем первую
+                    // Вариант 3: Любая камера
                     try {
-                        console.log('🎯 Получаем список камер...');
-                        this.updateDebugInfo('status', 'Получение списка камер');
-                        this.updateCameraStatus('Поиск доступных камер...');
+                        window.mobileConsole.info('🎯 Получаем список всех камер...');
                         
                         const cameras = await Html5Qrcode.getCameras();
-                        console.log('📸 Найдены камеры:', cameras);
-                        this.updateDebugInfo('camera', `Найдено: ${cameras.length} камер`);
+                        window.mobileConsole.info(`📸 Найдено камер: ${cameras.length}`);
                         
                         if (cameras.length === 0) {
                             throw new Error('Камеры не найдены на устройстве');
                         }
                         
-                        console.log('🎯 Пробуем камеру:', cameras[0].label);
-                        this.updateDebugInfo('status', `Запуск: ${cameras[0].label}`);
-                        this.updateCameraStatus(`Запуск: ${cameras[0].label}`);
+                        window.mobileConsole.info(`🎯 Пробуем камеру: ${cameras[0].label}`);
                         
                         await this.scanner.start(
                             cameras[0].id,
                             config,
                             (decodedText) => {
-                                console.log('✅ QR-код распознан:', decodedText);
+                                window.mobileConsole.info(`✅ QR-код распознан: ${decodedText}`);
                                 this.onScanSuccess(decodedText);
                             },
                             (errorMessage) => {
@@ -1128,14 +1105,10 @@ class ScannerManager {
                             }
                         );
                         success = true;
-                        console.log('✅ Камера запущена по ID');
-                        this.updateDebugInfo('camera', cameras[0].label);
-                        this.updateDebugInfo('status', 'Камера работает');
+                        window.mobileConsole.info('✅ Камера запущена по ID');
                         
                     } catch (error3) {
-                        lastError = error3.message;
-                        console.log('❌ Все варианты не сработали:', error3.message);
-                        this.updateDebugInfo('error', error3.message);
+                        window.mobileConsole.error(`❌ Все варианты не сработали: ${error3.message}`);
                         throw new Error(`Не удалось запустить камеру: ${error3.message}`);
                     }
                 }
@@ -1148,16 +1121,12 @@ class ScannerManager {
                 if (startBtn) startBtn.classList.add('hidden');
                 if (stopBtn) stopBtn.classList.remove('hidden');
     
-                console.log('✅ Камера запущена успешно');
-                this.updateDebugInfo('status', 'Камера работает ✅');
-                this.updateCameraStatus('Камера запущена - наведите на QR-код');
+                window.mobileConsole.info('✅ Камера запущена успешно');
                 showSuccess('Камера запущена. Наведите на QR-код', 3000);
             }
     
         } catch (error) {
-            console.error('❌ Финальная ошибка запуска камеры:', error);
-            this.updateDebugInfo('status', 'Ошибка запуска ❌');
-            this.updateDebugInfo('error', error.message);
+            window.mobileConsole.error(`❌ Финальная ошибка запуска камеры: ${error.message}`);
             
             let message = 'Не удалось запустить камеру';
             if (error.message.includes('NotAllowedError')) {
@@ -1178,18 +1147,12 @@ class ScannerManager {
                         <div style="font-size: 48px; margin-bottom: 15px;">📷</div>
                         <h4>Камера недоступна</h4>
                         <p>${message}</p>
-                        <div style="color: #666; font-size: 12px; margin: 10px 0;">
-                            Ошибка: ${error.message}
-                        </div>
                         <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
                             <button class="btn btn-primary" onclick="scannerManager.showManualInput()">
                                 ✍️ Ввести код вручную
                             </button>
                             <button class="btn btn-outline" onclick="scannerManager.toggleSimulator()">
                                 🧪 Тестовые коды
-                            </button>
-                            <button class="btn btn-outline" onclick="scannerManager.debugCamera()">
-                                🐛 Отладка камеры
                             </button>
                         </div>
                     </div>
