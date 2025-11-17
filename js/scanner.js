@@ -22,16 +22,39 @@ class ScannerManager {
         this.checkExistingSession();
         this.checkNotifications();
     
-        // ПРОВЕРЯЕМ ПОДДЕРЖКУ КАМЕРЫ
-        setTimeout(async () => {
-            const cameraSupported = await this.checkCameraSupport();
-            if (!cameraSupported) {
-                showWarning('📷 Камера не доступна. Используйте симулятор для тестирования.', 5000);
-                this.showSimulator();
+        // ПРОВЕРЯЕМ CHROME ANDROID И ПОКАЗЫВАЕМ СПЕЦИАЛЬНУЮ КНОПКУ
+        setTimeout(() => {
+            const isChromeAndroid = /Chrome/.test(navigator.userAgent) && /Android/.test(navigator.userAgent);
+            if (isChromeAndroid) {
+                this.showChromePermissionButton();
             }
         }, 1000);
     
         showSuccess('Складской модуль готов к работе', 3000);
+    }
+    
+    // ПОКАЗ КНОПКИ РАЗРЕШЕНИЯ ДЛЯ CHROME
+    showChromePermissionButton() {
+        const permissionBtn = document.getElementById('requestCameraPermission');
+        if (permissionBtn) {
+            permissionBtn.classList.remove('hidden');
+            
+            permissionBtn.addEventListener('click', async () => {
+                try {
+                    // ЗАПРАШИВАЕМ РАЗРЕШЕНИЕ ПРОСТЫМ ЗАПРОСОМ
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    
+                    // ОСТАНАВЛИВАЕМ ПОТОК
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    showSuccess('✅ Доступ к камере разрешен! Теперь попробуйте запустить камеру.', 5000);
+                    permissionBtn.classList.add('hidden');
+                    
+                } catch (error) {
+                    showError('❌ Не удалось получить разрешение: ' + error.message);
+                }
+            });
+        }
     }
 
     // Добавьте этот метод в класс ScannerManager
@@ -1089,8 +1112,18 @@ class ScannerManager {
             }
 
         } catch (error) {
-            console.error('❌ Ошибка запуска камеры:', error);
+            console.error('❌ Основной метод не сработал, пробуем альтернативный...');
             
+            // ПРОБУЕМ АЛЬТЕРНАТИВНЫЙ МЕТОД ДЛЯ CHROME
+            if (/Chrome/.test(navigator.userAgent) && /Android/.test(navigator.userAgent)) {
+                try {
+                    await this.startCameraChromeFallback();
+                    return; // Успех!
+                } catch (fallbackError) {
+                    console.error('❌ Альтернативный метод тоже не сработал:', fallbackError);
+                    lastError = fallbackError;
+                }
+            }
             let message = 'Не удалось запустить камеру: ' + error.message;
             if (error.message.includes('NotAllowedError')) {
                 message = '📷 Разрешите доступ к камере в настройках браузера\n\n1. Нажмите на значок 🔒 в адресной строке\n2. Выберите "Разрешить доступ к камере"\n3. Перезагрузите страницу';
@@ -1102,6 +1135,57 @@ class ScannerManager {
             
             showError(message);
             this.showSimulator();
+        }
+    }
+
+    // АЛЬТЕРНАТИВНЫЙ ЗАПУСК ДЛЯ CHROME
+    async startCameraChromeFallback() {
+        console.log('🔄 Альтернативный запуск для Chrome...');
+        
+        try {
+            // ПРЯМОЙ ЗАПРОС РАЗРЕШЕНИЯ
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: {
+                    facingMode: "environment",
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                } 
+            });
+            
+            console.log('✅ Разрешение получено, создаем сканер...');
+            
+            // ТЕПЕРЬ СОЗДАЕМ СКАНЕР
+            const container = document.getElementById('reader');
+            container.innerHTML = '';
+            
+            this.scanner = new Html5Qrcode("reader");
+            
+            // ЗАПУСКАЕМ СКАНЕР С УЖЕ ПОЛУЧЕННЫМ РАЗРЕШЕНИЕМ
+            await this.scanner.start(
+                { deviceId: { exact: stream.getVideoTracks()[0].getSettings().deviceId } },
+                { 
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                (decodedText) => {
+                    this.onScanSuccess(decodedText);
+                },
+                (errorMessage) => {}
+            );
+            
+            // ОСТАНАВЛИВАЕМ НАШ ПОТОК (сканер создаст свой)
+            stream.getTracks().forEach(track => track.stop());
+            
+            this.isScanning = true;
+            document.getElementById('startCamera').classList.add('hidden');
+            document.getElementById('stopCamera').classList.remove('hidden');
+            this.hideScannerPlaceholder();
+            
+            showSuccess('📷 Камера запущена через альтернативный метод!', 3000);
+            
+        } catch (error) {
+            console.error('❌ Альтернативный метод не сработал:', error);
+            throw error;
         }
     }
 
