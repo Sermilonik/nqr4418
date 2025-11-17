@@ -1026,64 +1026,99 @@ class ScannerManager {
             // Создаем сканер
             this.scanner = new Html5Qrcode("reader");
             
-            // Конфигурация сканера
+            // УПРОЩЕННАЯ КОНФИГУРАЦИЯ - минимум параметров
             const config = {
                 fps: 10,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0,
-                disableFlip: false
+                qrbox: { width: 250, height: 250 }
             };
     
-            console.log('🔍 Получаем список камер...');
+            console.log('🔍 Пытаемся найти камеру...');
+    
+            // ПРОБУЕМ РАЗНЫЕ ВАРИАНТЫ ЗАПУСКА КАМЕРЫ
+            let success = false;
             
-            // Получаем камеры
-            const cameras = await Html5Qrcode.getCameras();
-            console.log('📸 Доступные камеры:', cameras);
-    
-            if (cameras.length === 0) {
-                throw new Error('Камеры не найдены на устройстве');
-            }
-    
-            // Выбираем камеру (предпочтительно заднюю)
-            let cameraId = cameras[0].id;
-            const rearCamera = cameras.find(cam => 
-                cam.label.toLowerCase().includes('back') || 
-                cam.label.toLowerCase().includes('rear') ||
-                cam.label.toLowerCase().includes('environment')
-            );
-            
-            if (rearCamera) {
-                cameraId = rearCamera.id;
-                console.log('🎯 Используем заднюю камеру:', rearCamera.label);
-            } else {
-                console.log('🎯 Используем камеру по умолчанию:', cameras[0].label);
-            }
-    
-            console.log('🚀 Запускаем сканирование...');
-    
-            // Запускаем сканирование
-            await this.scanner.start(
-                cameraId,
-                config,
-                (decodedText) => {
-                    // Успешное сканирование!
-                    console.log('✅ QR-код распознан:', decodedText);
-                    this.onScanSuccess(decodedText);
-                },
-                (errorMessage) => {
-                    // Игнорируем ошибки сканирования (это нормально)
-                    console.log('📊 Статус сканирования:', errorMessage);
+            try {
+                // Вариант 1: Запуск с environment (задняя камера)
+                console.log('🎯 Пробуем заднюю камеру...');
+                await this.scanner.start(
+                    { facingMode: "environment" },
+                    config,
+                    (decodedText) => {
+                        console.log('✅ QR-код распознан:', decodedText);
+                        this.onScanSuccess(decodedText);
+                    },
+                    (errorMessage) => {
+                        // Игнорируем ошибки сканирования
+                    }
+                );
+                success = true;
+                console.log('✅ Задняя камера запущена');
+                
+            } catch (error1) {
+                console.log('❌ Задняя камера не доступна:', error1.message);
+                
+                try {
+                    // Вариант 2: Запуск с user (передняя камера)
+                    console.log('🎯 Пробуем переднюю камеру...');
+                    await this.scanner.start(
+                        { facingMode: "user" },
+                        config,
+                        (decodedText) => {
+                            console.log('✅ QR-код распознан:', decodedText);
+                            this.onScanSuccess(decodedText);
+                        },
+                        (errorMessage) => {
+                            // Игнорируем ошибки сканирования
+                        }
+                    );
+                    success = true;
+                    console.log('✅ Передняя камера запущена');
+                    
+                } catch (error2) {
+                    console.log('❌ Передняя камера не доступна:', error2.message);
+                    
+                    try {
+                        // Вариант 3: Автоматический выбор камеры
+                        console.log('🎯 Пробуем автоматический выбор камеры...');
+                        const cameras = await Html5Qrcode.getCameras();
+                        console.log('📸 Найдены камеры:', cameras);
+                        
+                        if (cameras.length === 0) {
+                            throw new Error('Камеры не найдены');
+                        }
+                        
+                        // Используем первую доступную камеру
+                        await this.scanner.start(
+                            cameras[0].id,
+                            config,
+                            (decodedText) => {
+                                console.log('✅ QR-код распознан:', decodedText);
+                                this.onScanSuccess(decodedText);
+                            },
+                            (errorMessage) => {
+                                // Игнорируем ошибки сканирования
+                            }
+                        );
+                        success = true;
+                        console.log('✅ Камера запущена по ID');
+                        
+                    } catch (error3) {
+                        console.log('❌ Все варианты не сработали:', error3.message);
+                        throw new Error('Не удалось запустить ни одну камеру');
+                    }
                 }
-            );
+            }
     
-            this.isScanning = true;
-            
-            // Обновляем UI кнопок
-            if (startBtn) startBtn.classList.add('hidden');
-            if (stopBtn) stopBtn.classList.remove('hidden');
+            if (success) {
+                this.isScanning = true;
+                
+                // Обновляем UI кнопок
+                if (startBtn) startBtn.classList.add('hidden');
+                if (stopBtn) stopBtn.classList.remove('hidden');
     
-            console.log('✅ Камера запущена успешно');
-            showSuccess('Камера запущена. Наведите на QR-код', 3000);
+                console.log('✅ Камера запущена успешно');
+                showSuccess('Камера запущена. Наведите на QR-код', 3000);
+            }
     
         } catch (error) {
             console.error('❌ Ошибка запуска камеры:', error);
@@ -1091,7 +1126,7 @@ class ScannerManager {
             let message = 'Не удалось запустить камеру';
             if (error.message.includes('NotAllowedError')) {
                 message = 'Доступ к камере запрещен. Разрешите доступ в настройках браузера.';
-            } else if (error.message.includes('NotFoundError')) {
+            } else if (error.message.includes('NotFoundError') || error.message.includes('Requested device not found')) {
                 message = 'Камера не найдена на устройстве.';
             } else if (error.message.includes('NotSupportedError')) {
                 message = 'Ваш браузер не поддерживает доступ к камере.';
