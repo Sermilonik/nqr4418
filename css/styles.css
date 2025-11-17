@@ -891,19 +891,36 @@ h1 {
 }
 
 .contractor-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-    max-height: 300px;
+    max-height: 200px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain;
+    position: absolute;
+    z-index: 1000;
     background: white;
+    width: 100%;
     border: 1px solid #ddd;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
 }
 
+@supports (-webkit-touch-callout: none) {
+    .contractor-dropdown {
+        -webkit-overflow-scrolling: touch;
+        overflow-y: scroll;
+    }
+}
+
+.contractor-option {
+    padding: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.contractor-option:active {
+    background: #f0f0f0;
+}
 
 .dropdown-item {
     padding: 12px 16px;
@@ -1189,4 +1206,34 @@ h1 {
     border: 1px solid #b8daff;
     padding: 5px 10px;
     border-radius: 4px;
+}
+
+/* Отладочная панель */
+.debug-panel {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    z-index: 10000;
+    max-width: 300px;
+}
+
+.debug-info {
+    margin: 5px 0;
+    font-family: monospace;
+}
+
+.debug-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    margin: 2px;
+    cursor: pointer;
+    font-size: 10px;
 }
