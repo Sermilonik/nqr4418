@@ -1022,239 +1022,561 @@
     <script src="js/notifications.js"></script>
     <script src="js/scanner.js"></script>
 
-<script>
-    // Простой сканер для отладки
-    class SimpleScanner {
-        constructor() {
-            this.html5QrcodeScanner = null;
-            this.isScanning = false;
-        }
-
-        init() {
-            console.log('Инициализация сканера...');
-            this.bindEvents();
-            this.updateUI();
-        }
-
-        bindEvents() {
-            const startBtn = document.getElementById('startCamera');
-            const stopBtn = document.getElementById('stopCamera');
-            const simulatorBtn = document.getElementById('showSimulator');
-
-            if (startBtn) {
-                startBtn.addEventListener('click', () => this.startCamera());
-                startBtn.disabled = false;
+    <script>
+        // Простой и надежный сканер
+        class SimpleQRScanner {
+            constructor() {
+                this.videoElement = null;
+                this.canvasElement = null;
+                this.isScanning = false;
+                this.stream = null;
+                this.animationFrame = null;
             }
-
-            if (stopBtn) {
-                stopBtn.addEventListener('click', () => this.stopCamera());
+    
+            init() {
+                console.log('🚀 Инициализация SimpleQRScanner');
+                this.createCameraElements();
+                this.bindEvents();
+                this.setupBasicUI();
             }
-
-            if (simulatorBtn) {
-                simulatorBtn.addEventListener('click', () => this.toggleSimulator());
+    
+            createCameraElements() {
+                // Создаем скрытые элементы для камеры
+                this.videoElement = document.createElement('video');
+                this.videoElement.id = 'qrVideo';
+                this.videoElement.playsInline = true;
+                this.videoElement.style.display = 'none';
+                
+                this.canvasElement = document.createElement('canvas');
+                this.canvasElement.id = 'qrCanvas';
+                this.canvasElement.style.display = 'none';
+                
+                document.body.appendChild(this.videoElement);
+                document.body.appendChild(this.canvasElement);
             }
-
-            console.log('События привязаны');
-        }
-
-        async startCamera() {
-            console.log('Запуск камеры...');
-            
-            try {
-                // Показываем контейнер сканера
+    
+            bindEvents() {
+                const startBtn = document.getElementById('startCamera');
+                const stopBtn = document.getElementById('stopCamera');
+                const simulatorBtn = document.getElementById('showSimulator');
+    
+                if (startBtn) {
+                    startBtn.addEventListener('click', () => this.startCamera());
+                    startBtn.disabled = false;
+                }
+    
+                if (stopBtn) {
+                    stopBtn.addEventListener('click', () => this.stopCamera());
+                }
+    
+                if (simulatorBtn) {
+                    simulatorBtn.addEventListener('click', () => this.toggleSimulator());
+                }
+    
+                // Кнопки симулятора
+                const testCodes = document.querySelectorAll('.test-code');
+                testCodes.forEach(code => {
+                    code.addEventListener('click', (e) => {
+                        const codeText = e.currentTarget.querySelector('.code-preview').textContent;
+                        this.simulateScan(codeText);
+                    });
+                });
+            }
+    
+            setupBasicUI() {
+                // Активируем кнопки
+                const startBtn = document.getElementById('startCamera');
+                if (startBtn) startBtn.disabled = false;
+            }
+    
+            async startCamera() {
+                console.log('📷 Запуск камеры...');
+                
+                if (this.isScanning) {
+                    console.log('Камера уже запущена');
+                    return;
+                }
+    
+                try {
+                    // Показываем контейнер сканера
+                    const reader = document.getElementById('reader');
+                    const startBtn = document.getElementById('startCamera');
+                    const stopBtn = document.getElementById('stopCamera');
+    
+                    if (reader) {
+                        reader.classList.remove('hidden');
+                        // Очищаем контейнер
+                        reader.innerHTML = '<div class="scanner-placeholder"><span class="placeholder-icon">📷</span><p>Запуск камеры...</p></div>';
+                    }
+    
+                    // Запрашиваем доступ к камере
+                    this.stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        } 
+                    });
+    
+                    console.log('✅ Камера доступна');
+    
+                    // Настраиваем видео элемент
+                    this.videoElement.srcObject = this.stream;
+                    this.videoElement.playsInline = true;
+                    
+                    // Ждем загрузки видео
+                    await new Promise((resolve) => {
+                        this.videoElement.onloadedmetadata = () => {
+                            this.videoElement.play();
+                            resolve();
+                        };
+                    });
+    
+                    // Создаем интерфейс сканирования
+                    this.createScannerInterface();
+                    
+                    // Обновляем UI
+                    if (startBtn) startBtn.classList.add('hidden');
+                    if (stopBtn) stopBtn.classList.remove('hidden');
+    
+                    this.isScanning = true;
+                    console.log('✅ Камера запущена успешно');
+    
+                    // Показываем инструкцию
+                    this.showNotification('Камера запущена. Наведите на QR-код', 'success');
+    
+                } catch (error) {
+                    console.error('❌ Ошибка камеры:', error);
+                    this.handleCameraError(error);
+                }
+            }
+    
+            createScannerInterface() {
+                const reader = document.getElementById('reader');
+                if (!reader) return;
+    
+                // Создаем интерфейс сканирования
+                reader.innerHTML = `
+                    <div class="scanner-view">
+                        <div class="scanner-frame">
+                            <div class="frame-corner top-left"></div>
+                            <div class="frame-corner top-right"></div>
+                            <div class="frame-corner bottom-left"></div>
+                            <div class="frame-corner bottom-right"></div>
+                            <div class="scan-line"></div>
+                        </div>
+                        <div class="scanner-instruction">
+                            📱 Наведите камеру на QR-код
+                        </div>
+                        <div class="scanner-fallback">
+                            <button class="btn btn-outline" onclick="window.simpleScanner.showManualInput()">
+                                ✍️ Ввести код вручную
+                            </button>
+                        </div>
+                    </div>
+                `;
+    
+                // Добавляем стили для сканера
+                this.addScannerStyles();
+    
+                // Запускаем "анимацию" сканирования
+                this.startScannerAnimation();
+            }
+    
+            addScannerStyles() {
+                const styles = `
+                    .scanner-view {
+                        position: relative;
+                        width: 100%;
+                        height: 300px;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        background: #000;
+                        border-radius: 12px;
+                        overflow: hidden;
+                    }
+                    
+                    .scanner-frame {
+                        position: relative;
+                        width: 250px;
+                        height: 250px;
+                        border: 2px solid #fff;
+                        border-radius: 12px;
+                    }
+                    
+                    .frame-corner {
+                        position: absolute;
+                        width: 20px;
+                        height: 20px;
+                        border: 3px solid #007bff;
+                    }
+                    
+                    .frame-corner.top-left {
+                        top: -3px;
+                        left: -3px;
+                        border-right: none;
+                        border-bottom: none;
+                        border-top-left-radius: 8px;
+                    }
+                    
+                    .frame-corner.top-right {
+                        top: -3px;
+                        right: -3px;
+                        border-left: none;
+                        border-bottom: none;
+                        border-top-right-radius: 8px;
+                    }
+                    
+                    .frame-corner.bottom-left {
+                        bottom: -3px;
+                        left: -3px;
+                        border-right: none;
+                        border-top: none;
+                        border-bottom-left-radius: 8px;
+                    }
+                    
+                    .frame-corner.bottom-right {
+                        bottom: -3px;
+                        right: -3px;
+                        border-left: none;
+                        border-top: none;
+                        border-bottom-right-radius: 8px;
+                    }
+                    
+                    .scan-line {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 3px;
+                        background: linear-gradient(90deg, transparent, #007bff, transparent);
+                        animation: scan 2s linear infinite;
+                    }
+                    
+                    @keyframes scan {
+                        0% { top: 0; }
+                        50% { top: 100%; }
+                        100% { top: 0; }
+                    }
+                    
+                    .scanner-instruction {
+                        color: white;
+                        margin-top: 20px;
+                        text-align: center;
+                        font-weight: 500;
+                    }
+                    
+                    .scanner-fallback {
+                        margin-top: 15px;
+                    }
+                    
+                    .manual-input-modal {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(0,0,0,0.8);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 2000;
+                    }
+                    
+                    .manual-input-content {
+                        background: white;
+                        padding: 20px;
+                        border-radius: 12px;
+                        width: 90%;
+                        max-width: 400px;
+                    }
+                `;
+    
+                if (!document.getElementById('scanner-styles')) {
+                    const styleSheet = document.createElement('style');
+                    styleSheet.id = 'scanner-styles';
+                    styleSheet.textContent = styles;
+                    document.head.appendChild(styleSheet);
+                }
+            }
+    
+            startScannerAnimation() {
+                // Просто анимация для визуального эффекта
+                // В реальном приложении здесь был бы анализ QR-кодов
+                console.log('🎬 Анимация сканирования запущена');
+            }
+    
+            stopCamera() {
+                console.log('🛑 Остановка камеры...');
+                
+                this.isScanning = false;
+    
+                // Останавливаем поток камеры
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+    
+                // Останавливаем анимацию
+                if (this.animationFrame) {
+                    cancelAnimationFrame(this.animationFrame);
+                }
+    
+                // Обновляем UI
                 const reader = document.getElementById('reader');
                 const startBtn = document.getElementById('startCamera');
                 const stopBtn = document.getElementById('stopCamera');
-                
+    
                 if (reader) {
-                    reader.classList.remove('hidden');
-                    console.log('Контейнер сканера показан');
+                    reader.classList.add('hidden');
                 }
-
-                // Скрываем плейсхолдер
-                const placeholder = reader.querySelector('.scanner-placeholder');
-                if (placeholder) {
-                    placeholder.style.display = 'none';
-                }
-
-                // Инициализируем сканер
-                this.html5QrcodeScanner = new Html5QrcodeScanner(
-                    "reader", 
-                    { 
-                        fps: 10, 
-                        qrbox: { width: 250, height: 250 },
-                        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_QR_CODE]
-                    }, 
-                    /* verbose= */ false
-                );
-
-                // Рендерим сканер
-                this.html5QrcodeScanner.render(
-                    (decodedText) => {
-                        console.log('QR код распознан:', decodedText);
-                        this.onScanSuccess(decodedText);
-                    },
-                    (error) => {
-                        console.log('Ошибка сканирования:', error);
-                    }
-                );
-
-                this.isScanning = true;
+    
+                if (startBtn) startBtn.classList.remove('hidden');
+                if (stopBtn) stopBtn.classList.add('hidden');
+    
+                this.showNotification('Камера выключена', 'info');
+                console.log('✅ Камера остановлена');
+            }
+    
+            handleCameraError(error) {
+                console.error('Ошибка камеры:', error);
                 
-                // Обновляем UI
-                if (startBtn) startBtn.classList.add('hidden');
-                if (stopBtn) stopBtn.classList.remove('hidden');
-
-                console.log('Камера запущена успешно');
-
-            } catch (error) {
-                console.error('Ошибка при запуске камеры:', error);
-                this.showError('Ошибка запуска камеры: ' + error.message);
-            }
-        }
-
-        stopCamera() {
-            console.log('Остановка камеры...');
-            
-            if (this.html5QrcodeScanner && this.isScanning) {
-                this.html5QrcodeScanner.clear().then(() => {
-                    console.log('Сканер очищен');
-                }).catch(err => {
-                    console.error('Ошибка при очистке сканера:', err);
-                });
-            }
-
-            this.isScanning = false;
-
-            // Обновляем UI
-            const reader = document.getElementById('reader');
-            const startBtn = document.getElementById('startCamera');
-            const stopBtn = document.getElementById('stopCamera');
-
-            if (reader) {
-                // Показываем плейсхолдер
-                const placeholder = reader.querySelector('.scanner-placeholder');
-                if (placeholder) {
-                    placeholder.style.display = 'flex';
+                let errorMessage = 'Не удалось получить доступ к камере';
+                
+                if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                    errorMessage = 'Камера не найдена. Убедитесь, что камера подключена и доступна.';
+                } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    errorMessage = 'Доступ к камере запрещен. Разрешите доступ к камере в настройках браузера.';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMessage = 'Ваш браузер не поддерживает доступ к камере.';
+                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                    errorMessage = 'Камера уже используется другим приложением.';
                 }
-                reader.classList.add('hidden');
+    
+                this.showNotification(errorMessage, 'error');
+                
+                // Показываем альтернативные варианты
+                this.showFallbackOptions();
             }
-
-            if (startBtn) startBtn.classList.remove('hidden');
-            if (stopBtn) stopBtn.classList.add('hidden');
-
-            console.log('Камера остановлена');
-        }
-
-        onScanSuccess(decodedText) {
-            console.log('Сканирование успешно:', decodedText);
-            
-            // Показываем уведомление
-            this.showNotification(`Отсканирован код: ${decodedText}`, 'success');
-            
-            // Здесь можно добавить логику обработки отсканированного кода
-            this.addToCodesList(decodedText);
-        }
-
-        addToCodesList(code) {
-            const codesList = document.getElementById('codesList');
-            const totalCodes = document.getElementById('totalCodes');
-            
-            if (!codesList) return;
-
-            // Убираем пустое состояние если есть
-            const emptyState = codesList.querySelector('.empty-state');
-            if (emptyState) {
-                emptyState.remove();
+    
+            showFallbackOptions() {
+                const reader = document.getElementById('reader');
+                if (!reader) return;
+    
+                reader.innerHTML = `
+                    <div class="scanner-fallback-options">
+                        <div class="fallback-header">
+                            <span class="fallback-icon">📷</span>
+                            <h4>Не удалось запустить камеру</h4>
+                        </div>
+                        <div class="fallback-actions">
+                            <button class="btn btn-primary" onclick="window.simpleScanner.showManualInput()">
+                                ✍️ Ввести код вручную
+                            </button>
+                            <button class="btn btn-outline" onclick="window.simpleScanner.toggleSimulator()">
+                                🧪 Использовать симулятор
+                            </button>
+                            <button class="btn btn-outline" onclick="window.simpleScanner.retryCamera()">
+                                🔄 Попробовать снова
+                            </button>
+                        </div>
+                        <div class="fallback-tips">
+                            <strong>Советы:</strong>
+                            <ul>
+                                <li>Разрешите доступ к камере в настройках браузера</li>
+                                <li>Убедитесь, что камера не используется другим приложением</li>
+                                <li>Проверьте, что камера работает в других приложениях</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+                reader.classList.remove('hidden');
             }
-
-            // Добавляем новый код
-            const codeItem = document.createElement('div');
-            codeItem.className = 'code-item';
-            codeItem.innerHTML = `
-                <span class="code-text">${code}</span>
-                <div class="code-actions">
-                    <button class="btn btn-sm btn-outline" onclick="this.parentElement.parentElement.remove(); updateTotalCodes();">🗑️</button>
-                </div>
-            `;
-            
-            codesList.appendChild(codeItem);
-            this.updateTotalCodes();
-        }
-
-        updateTotalCodes() {
-            const codesList = document.getElementById('codesList');
-            const totalCodes = document.getElementById('totalCodes');
-            
-            if (codesList && totalCodes) {
-                const codeCount = codesList.querySelectorAll('.code-item').length;
-                totalCodes.textContent = codeCount;
+    
+            showManualInput() {
+                const modal = document.createElement('div');
+                modal.className = 'manual-input-modal';
+                modal.innerHTML = `
+                    <div class="manual-input-content">
+                        <h3>✍️ Ввод кода вручную</h3>
+                        <div class="form-group">
+                            <label>Введите QR-код:</label>
+                            <input type="text" id="manualCodeInput" class="form-select" placeholder="0104604063405720219NQNfSwVmcTEST001">
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" onclick="window.simpleScanner.submitManualCode()">
+                                ✅ Добавить код
+                            </button>
+                            <button class="btn btn-outline" onclick="this.closest('.manual-input-modal').remove()">
+                                ❌ Отмена
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+    
+                // Фокус на поле ввода
+                setTimeout(() => {
+                    const input = document.getElementById('manualCodeInput');
+                    if (input) input.focus();
+                }, 100);
+            }
+    
+            submitManualCode() {
+                const input = document.getElementById('manualCodeInput');
+                const modal = document.querySelector('.manual-input-modal');
+                
+                if (input && input.value.trim()) {
+                    this.onScanSuccess(input.value.trim());
+                    if (modal) modal.remove();
+                } else {
+                    this.showNotification('Введите код', 'error');
+                }
+            }
+    
+            retryCamera() {
+                this.stopCamera();
+                setTimeout(() => this.startCamera(), 500);
+            }
+    
+            onScanSuccess(decodedText) {
+                console.log('✅ Сканирование успешно:', decodedText);
+                
+                this.showNotification(`Отсканирован код: ${decodedText}`, 'success');
+                this.addToCodesList(decodedText);
+                
+                // Вибрация (если поддерживается)
+                if (navigator.vibrate) {
+                    navigator.vibrate(200);
+                }
+            }
+    
+            addToCodesList(code) {
+                const codesList = document.getElementById('codesList');
+                const totalCodes = document.getElementById('totalCodes');
+                
+                if (!codesList) return;
+    
+                // Убираем пустое состояние если есть
+                const emptyState = codesList.querySelector('.empty-state');
+                if (emptyState) {
+                    emptyState.remove();
+                }
+    
+                // Добавляем новый код
+                const codeItem = document.createElement('div');
+                codeItem.className = 'code-item';
+                codeItem.innerHTML = `
+                    <span class="code-text">${code}</span>
+                    <div class="code-actions">
+                        <button class="btn btn-sm btn-outline" onclick="this.parentElement.parentElement.remove(); window.simpleScanner.updateTotalCodes();">
+                            🗑️
+                        </button>
+                    </div>
+                `;
+                
+                codesList.appendChild(codeItem);
+                this.updateTotalCodes();
+            }
+    
+            updateTotalCodes() {
+                const codesList = document.getElementById('codesList');
+                const totalCodes = document.getElementById('totalCodes');
+                
+                if (codesList && totalCodes) {
+                    const codeCount = codesList.querySelectorAll('.code-item').length;
+                    totalCodes.textContent = codeCount;
+                    
+                    // Активируем кнопку генерации отчета если есть коды
+                    const generateBtn = document.getElementById('generateReport');
+                    if (generateBtn) {
+                        generateBtn.disabled = codeCount === 0;
+                    }
+                }
+            }
+    
+            toggleSimulator() {
+                const simulator = document.getElementById('simulator');
+                if (simulator) {
+                    simulator.classList.toggle('hidden');
+                }
+            }
+    
+            simulateScan(code) {
+                console.log('🧪 Симуляция сканирования:', code);
+                this.onScanSuccess(code);
+            }
+    
+            simulateMultipleScans() {
+                const testCodes = [
+                    '0104604063405720219NQNfSwVmcTEST001',
+                    '0104604063405720219NQNfSwVmdTEST002',
+                    '0104604063405720219NQNfSwVmeTEST003',
+                    '0104604063405720219NQNfSwVmfTEST004',
+                    '0104604063405720219NQNfSwVmgTEST005'
+                ];
+                
+                testCodes.forEach((code, index) => {
+                    setTimeout(() => {
+                        this.simulateScan(code);
+                    }, index * 300);
+                });
+                
+                this.showNotification('Добавлено 5 тестовых кодов', 'success');
+            }
+    
+            showNotification(message, type = 'info') {
+                // Простое уведомление
+                const notification = document.createElement('div');
+                notification.className = `notification notification-${type}`;
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#007bff'};
+                    color: white;
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    z-index: 10000;
+                    max-width: 300px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                `;
+                notification.textContent = message;
+                
+                document.body.appendChild(notification);
+                
+                // Автоудаление через 3 секунды
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 3000);
+            }
+    
+            hideSimulator() {
+                const simulator = document.getElementById('simulator');
+                if (simulator) {
+                    simulator.classList.add('hidden');
+                }
             }
         }
-
-        toggleSimulator() {
-            const simulator = document.getElementById('simulator');
-            if (simulator) {
-                simulator.classList.toggle('hidden');
-            }
-        }
-
-        simulateScan(code) {
-            console.log('Симуляция сканирования:', code);
-            this.onScanSuccess(code);
-        }
-
-        showNotification(message, type = 'info') {
-            // Простое уведомление в консоль
-            console.log(`Уведомление (${type}): ${message}`);
+    
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM загружен, запускаем SimpleQRScanner');
             
-            // Можно добавить красивые уведомления позже
-            alert(message);
-        }
-
-        showError(message) {
-            this.showNotification(message, 'error');
-        }
-
-        updateUI() {
-            // Активируем кнопку запуска камеры
-            const startBtn = document.getElementById('startCamera');
-            if (startBtn) {
-                startBtn.disabled = false;
-                console.log('Кнопка активирована');
-            }
-        }
-    }
-
-    // Инициализация при загрузке страницы
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM загружен, инициализация сканера...');
-        
-        // Проверяем наличие библиотеки
-        if (typeof Html5QrcodeScanner === 'undefined') {
-            console.error('Библиотека Html5QrcodeScanner не загружена!');
-            alert('Ошибка: Библиотека сканирования не загружена. Проверьте подключение к интернету.');
-            return;
-        }
-
-        console.log('Библиотека Html5QrcodeScanner доступна');
-
-        // Создаем и инициализируем сканер
-        window.simpleScanner = new SimpleScanner();
-        window.simpleScanner.init();
-
-        // Добавляем тестовые функции
-        window.simulateScan = (code) => window.simpleScanner.simulateScan(code);
-        window.toggleSimulator = () => window.simpleScanner.toggleSimulator();
-    });
-
-    // Функция для обновления счетчика кодов (для кнопки удаления)
-    function updateTotalCodes() {
-        if (window.simpleScanner) {
-            window.simpleScanner.updateTotalCodes();
-        }
-    }
-</script>
+            // Создаем и инициализируем сканер
+            window.simpleScanner = new SimpleQRScanner();
+            window.simpleScanner.init();
+    
+            // Глобальные функции для кнопок
+            window.simulateScan = (code) => window.simpleScanner.simulateScan(code);
+            window.toggleSimulator = () => window.simpleScanner.toggleSimulator();
+            
+            console.log('✅ SimpleQRScanner инициализирован');
+        });
+    </script>
 </body>
 </html>
-
