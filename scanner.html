@@ -1022,13 +1022,239 @@
     <script src="js/notifications.js"></script>
     <script src="js/scanner.js"></script>
 
-    <script>
-        // Инициализация при загрузке страницы
-        document.addEventListener('DOMContentLoaded', function() {
-            if (window.scannerManager) {
-                scannerManager.init();
+<script>
+    // Простой сканер для отладки
+    class SimpleScanner {
+        constructor() {
+            this.html5QrcodeScanner = null;
+            this.isScanning = false;
+        }
+
+        init() {
+            console.log('Инициализация сканера...');
+            this.bindEvents();
+            this.updateUI();
+        }
+
+        bindEvents() {
+            const startBtn = document.getElementById('startCamera');
+            const stopBtn = document.getElementById('stopCamera');
+            const simulatorBtn = document.getElementById('showSimulator');
+
+            if (startBtn) {
+                startBtn.addEventListener('click', () => this.startCamera());
+                startBtn.disabled = false;
             }
-        });
-    </script>
+
+            if (stopBtn) {
+                stopBtn.addEventListener('click', () => this.stopCamera());
+            }
+
+            if (simulatorBtn) {
+                simulatorBtn.addEventListener('click', () => this.toggleSimulator());
+            }
+
+            console.log('События привязаны');
+        }
+
+        async startCamera() {
+            console.log('Запуск камеры...');
+            
+            try {
+                // Показываем контейнер сканера
+                const reader = document.getElementById('reader');
+                const startBtn = document.getElementById('startCamera');
+                const stopBtn = document.getElementById('stopCamera');
+                
+                if (reader) {
+                    reader.classList.remove('hidden');
+                    console.log('Контейнер сканера показан');
+                }
+
+                // Скрываем плейсхолдер
+                const placeholder = reader.querySelector('.scanner-placeholder');
+                if (placeholder) {
+                    placeholder.style.display = 'none';
+                }
+
+                // Инициализируем сканер
+                this.html5QrcodeScanner = new Html5QrcodeScanner(
+                    "reader", 
+                    { 
+                        fps: 10, 
+                        qrbox: { width: 250, height: 250 },
+                        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_QR_CODE]
+                    }, 
+                    /* verbose= */ false
+                );
+
+                // Рендерим сканер
+                this.html5QrcodeScanner.render(
+                    (decodedText) => {
+                        console.log('QR код распознан:', decodedText);
+                        this.onScanSuccess(decodedText);
+                    },
+                    (error) => {
+                        console.log('Ошибка сканирования:', error);
+                    }
+                );
+
+                this.isScanning = true;
+                
+                // Обновляем UI
+                if (startBtn) startBtn.classList.add('hidden');
+                if (stopBtn) stopBtn.classList.remove('hidden');
+
+                console.log('Камера запущена успешно');
+
+            } catch (error) {
+                console.error('Ошибка при запуске камеры:', error);
+                this.showError('Ошибка запуска камеры: ' + error.message);
+            }
+        }
+
+        stopCamera() {
+            console.log('Остановка камеры...');
+            
+            if (this.html5QrcodeScanner && this.isScanning) {
+                this.html5QrcodeScanner.clear().then(() => {
+                    console.log('Сканер очищен');
+                }).catch(err => {
+                    console.error('Ошибка при очистке сканера:', err);
+                });
+            }
+
+            this.isScanning = false;
+
+            // Обновляем UI
+            const reader = document.getElementById('reader');
+            const startBtn = document.getElementById('startCamera');
+            const stopBtn = document.getElementById('stopCamera');
+
+            if (reader) {
+                // Показываем плейсхолдер
+                const placeholder = reader.querySelector('.scanner-placeholder');
+                if (placeholder) {
+                    placeholder.style.display = 'flex';
+                }
+                reader.classList.add('hidden');
+            }
+
+            if (startBtn) startBtn.classList.remove('hidden');
+            if (stopBtn) stopBtn.classList.add('hidden');
+
+            console.log('Камера остановлена');
+        }
+
+        onScanSuccess(decodedText) {
+            console.log('Сканирование успешно:', decodedText);
+            
+            // Показываем уведомление
+            this.showNotification(`Отсканирован код: ${decodedText}`, 'success');
+            
+            // Здесь можно добавить логику обработки отсканированного кода
+            this.addToCodesList(decodedText);
+        }
+
+        addToCodesList(code) {
+            const codesList = document.getElementById('codesList');
+            const totalCodes = document.getElementById('totalCodes');
+            
+            if (!codesList) return;
+
+            // Убираем пустое состояние если есть
+            const emptyState = codesList.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // Добавляем новый код
+            const codeItem = document.createElement('div');
+            codeItem.className = 'code-item';
+            codeItem.innerHTML = `
+                <span class="code-text">${code}</span>
+                <div class="code-actions">
+                    <button class="btn btn-sm btn-outline" onclick="this.parentElement.parentElement.remove(); updateTotalCodes();">🗑️</button>
+                </div>
+            `;
+            
+            codesList.appendChild(codeItem);
+            this.updateTotalCodes();
+        }
+
+        updateTotalCodes() {
+            const codesList = document.getElementById('codesList');
+            const totalCodes = document.getElementById('totalCodes');
+            
+            if (codesList && totalCodes) {
+                const codeCount = codesList.querySelectorAll('.code-item').length;
+                totalCodes.textContent = codeCount;
+            }
+        }
+
+        toggleSimulator() {
+            const simulator = document.getElementById('simulator');
+            if (simulator) {
+                simulator.classList.toggle('hidden');
+            }
+        }
+
+        simulateScan(code) {
+            console.log('Симуляция сканирования:', code);
+            this.onScanSuccess(code);
+        }
+
+        showNotification(message, type = 'info') {
+            // Простое уведомление в консоль
+            console.log(`Уведомление (${type}): ${message}`);
+            
+            // Можно добавить красивые уведомления позже
+            alert(message);
+        }
+
+        showError(message) {
+            this.showNotification(message, 'error');
+        }
+
+        updateUI() {
+            // Активируем кнопку запуска камеры
+            const startBtn = document.getElementById('startCamera');
+            if (startBtn) {
+                startBtn.disabled = false;
+                console.log('Кнопка активирована');
+            }
+        }
+    }
+
+    // Инициализация при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM загружен, инициализация сканера...');
+        
+        // Проверяем наличие библиотеки
+        if (typeof Html5QrcodeScanner === 'undefined') {
+            console.error('Библиотека Html5QrcodeScanner не загружена!');
+            alert('Ошибка: Библиотека сканирования не загружена. Проверьте подключение к интернету.');
+            return;
+        }
+
+        console.log('Библиотека Html5QrcodeScanner доступна');
+
+        // Создаем и инициализируем сканер
+        window.simpleScanner = new SimpleScanner();
+        window.simpleScanner.init();
+
+        // Добавляем тестовые функции
+        window.simulateScan = (code) => window.simpleScanner.simulateScan(code);
+        window.toggleSimulator = () => window.simpleScanner.toggleSimulator();
+    });
+
+    // Функция для обновления счетчика кодов (для кнопки удаления)
+    function updateTotalCodes() {
+        if (window.simpleScanner) {
+            window.simpleScanner.updateTotalCodes();
+        }
+    }
+</script>
 </body>
 </html>
+
