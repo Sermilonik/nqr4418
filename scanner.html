@@ -1011,6 +1011,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bwip-js@2.1.2/dist/bwip-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
     <!-- Альтернативная библиотека для PDF -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
@@ -1023,33 +1024,32 @@
     <script src="js/scanner.js"></script>
 
     <script>
-        // Надежный сканер с проверкой поддержки камеры
-        class ReliableScanner {
+        // Сканер с распознаванием QR-кодов
+        class QRScanner {
             constructor() {
                 this.isScanning = false;
                 this.stream = null;
                 this.video = null;
+                this.canvas = null;
+                this.context = null;
+                this.animationFrame = null;
                 this.supportsCamera = false;
+                this.lastScannedCode = null;
+                this.scanCooldown = 2000; // 2 секунды между сканированиями
             }
     
             init() {
-                console.log('🎯 Инициализация ReliableScanner');
+                console.log('🎯 Инициализация QRScanner');
                 this.checkCameraSupport();
                 this.applyMobileFixes();
                 this.bindEvents();
                 this.setupUI();
+                this.setupCanvas();
             }
     
             checkCameraSupport() {
-                // Проверяем поддержку mediaDevices
                 this.supportsCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-                
                 console.log('📱 Поддержка камеры:', this.supportsCamera);
-                
-                if (!this.supportsCamera) {
-                    console.warn('⚠️ Камера не поддерживается в этом браузере');
-                    this.showNotification('Ваш браузер не поддерживает камеру', 'error');
-                }
             }
     
             applyMobileFixes() {
@@ -1063,7 +1063,6 @@
                         overscroll-behavior: contain !important;
                     }
     
-                    /* Стили для сканера */
                     .scanner-container {
                         position: relative;
                         width: 100%;
@@ -1093,6 +1092,7 @@
                         flex-direction: column;
                         align-items: center;
                         justify-content: center;
+                        z-index: 10;
                     }
     
                     .frame-area {
@@ -1101,6 +1101,7 @@
                         border: 2px solid rgba(255,255,255,0.5);
                         border-radius: 12px;
                         position: relative;
+                        background: rgba(0,0,0,0.3);
                     }
     
                     .frame-corner {
@@ -1146,11 +1147,13 @@
                         height: 2px;
                         background: #00ff00;
                         animation: scan 2s ease-in-out infinite;
+                        box-shadow: 0 0 10px #00ff00;
                     }
     
                     @keyframes scan {
-                        0% { top: 0; }
-                        100% { top: 100%; }
+                        0% { top: 0; opacity: 1; }
+                        50% { opacity: 0.7; }
+                        100% { top: 100%; opacity: 1; }
                     }
     
                     .scan-instruction {
@@ -1158,10 +1161,36 @@
                         margin-top: 20px;
                         text-align: center;
                         font-weight: bold;
-                        text-shadow: 1px 1px 2px black;
+                        text-shadow: 1px 1px 3px black;
+                        background: rgba(0,0,0,0.7);
+                        padding: 10px 20px;
+                        border-radius: 20px;
                     }
     
-                    /* Адаптивность */
+                    .scan-result {
+                        position: absolute;
+                        bottom: 20px;
+                        left: 20px;
+                        right: 20px;
+                        background: rgba(0,0,0,0.8);
+                        color: white;
+                        padding: 10px;
+                        border-radius: 8px;
+                        text-align: center;
+                        font-size: 14px;
+                        display: none;
+                    }
+    
+                    .scan-result.success {
+                        background: rgba(40, 167, 69, 0.9);
+                        display: block;
+                    }
+    
+                    .scan-result.error {
+                        background: rgba(220, 53, 69, 0.9);
+                        display: block;
+                    }
+    
                     @media (max-width: 768px) {
                         .scanner-container {
                             height: 300px;
@@ -1172,8 +1201,25 @@
                             height: 200px;
                         }
                     }
+    
+                    /* Скрытый canvas для обработки изображения */
+                    .processing-canvas {
+                        position: absolute;
+                        top: -9999px;
+                        left: -9999px;
+                        width: 100px;
+                        height: 100px;
+                    }
                 `;
                 document.head.appendChild(style);
+            }
+    
+            setupCanvas() {
+                // Создаем скрытый canvas для обработки кадров
+                this.canvas = document.createElement('canvas');
+                this.canvas.className = 'processing-canvas';
+                this.context = this.canvas.getContext('2d');
+                document.body.appendChild(this.canvas);
             }
     
             bindEvents() {
@@ -1192,36 +1238,18 @@
                 if (simulatorBtn) {
                     simulatorBtn.addEventListener('click', () => this.toggleSimulator());
                 }
-    
-                // Фикс скроллинга при загрузке
-                setTimeout(() => this.fixDropdownScrolling(), 100);
-            }
-    
-            fixDropdownScrolling() {
-                const dropdown = document.getElementById('contractorDropdown');
-                if (dropdown) {
-                    dropdown.style.webkitOverflowScrolling = 'touch';
-                    dropdown.style.overflowY = 'auto';
-                }
             }
     
             async startCamera() {
-                console.log('📷 Пытаемся запустить камеру...');
+                console.log('📷 Запускаем камеру с распознаванием QR...');
                 
-                if (this.isScanning) {
-                    console.log('⚠️ Камера уже запущена');
-                    return;
-                }
-    
-                // Проверяем поддержку камеры
+                if (this.isScanning) return;
                 if (!this.supportsCamera) {
-                    this.showNotification('Камера не поддерживается в вашем браузере', 'error');
-                    this.showFallbackOptions();
+                    this.showNotification('Камера не поддерживается', 'error');
                     return;
                 }
     
                 try {
-                    // Показываем UI
                     const reader = document.getElementById('reader');
                     const startBtn = document.getElementById('startCamera');
                     const stopBtn = document.getElementById('stopCamera');
@@ -1233,30 +1261,22 @@
                                 <div class="scanner-placeholder">
                                     <span class="placeholder-icon">📷</span>
                                     <p>Запуск камеры...</p>
-                                    <p class="loading-text">Пожалуйста, подождите</p>
                                 </div>
                             </div>
                         `;
                     }
     
-                    // Останавливаем предыдущую камеру
                     await this.stopCamera();
                     await this.delay(200);
     
-                    console.log('🔍 Запрашиваем доступ к камере...');
-    
-                    // Безопасный запрос камеры
-                    const constraints = {
+                    // Запрашиваем камеру
+                    this.stream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             facingMode: 'environment',
                             width: { ideal: 1280 },
                             height: { ideal: 720 }
-                        },
-                        audio: false
-                    };
-    
-                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-                    console.log('✅ Доступ к камере получен');
+                        }
+                    });
     
                     // Создаем видео элемент
                     this.video = document.createElement('video');
@@ -1265,6 +1285,15 @@
                     this.video.muted = true;
                     this.video.srcObject = this.stream;
     
+                    // Ждем готовности видео
+                    await new Promise((resolve, reject) => {
+                        this.video.onloadeddata = () => {
+                            this.video.play().then(resolve).catch(reject);
+                        };
+                        this.video.onerror = reject;
+                        setTimeout(() => reject(new Error('Таймаут видео')), 5000);
+                    });
+    
                     // Заменяем плейсхолдер на видео
                     if (reader) {
                         const container = reader.querySelector('.scanner-container');
@@ -1272,57 +1301,29 @@
                             const placeholder = container.querySelector('.scanner-placeholder');
                             if (placeholder) placeholder.remove();
                             container.appendChild(this.video);
+                            
+                            // Добавляем рамку и результат
+                            this.addScanningInterface(container);
                         }
                     }
     
-                    // Ждем готовности видео
-                    await new Promise((resolve, reject) => {
-                        const onReady = () => {
-                            this.video.removeEventListener('loadeddata', onReady);
-                            this.video.removeEventListener('error', onError);
-                            console.log('🎬 Видео готово к воспроизведению');
-                            this.video.play().then(resolve).catch(reject);
-                        };
-    
-                        const onError = (err) => {
-                            this.video.removeEventListener('loadeddata', onReady);
-                            this.video.removeEventListener('error', onError);
-                            reject(err);
-                        };
-    
-                        this.video.addEventListener('loadeddata', onReady);
-                        this.video.addEventListener('error', onError);
-    
-                        // Таймаут
-                        setTimeout(() => {
-                            this.video.removeEventListener('loadeddata', onReady);
-                            this.video.removeEventListener('error', onError);
-                            reject(new Error('Таймаут загрузки видео'));
-                        }, 10000);
-                    });
-    
-                    // Добавляем рамку сканирования
-                    this.addScanningFrame();
+                    // Запускаем распознавание
+                    this.startQRScanning();
     
                     // Обновляем UI
                     if (startBtn) startBtn.classList.add('hidden');
                     if (stopBtn) stopBtn.classList.remove('hidden');
     
                     this.isScanning = true;
-                    
-                    console.log('✅ Камера успешно запущена!');
-                    this.showNotification('Камера запущена. Наведите на QR-код', 'success');
+                    console.log('✅ Камера запущена, начинаем распознавание QR-кодов');
     
                 } catch (error) {
-                    console.error('❌ Ошибка при запуске камеры:', error);
+                    console.error('❌ Ошибка камеры:', error);
                     this.handleCameraError(error);
                 }
             }
     
-            addScanningFrame() {
-                const container = document.querySelector('.scanner-container');
-                if (!container) return;
-    
+            addScanningInterface(container) {
                 const frame = document.createElement('div');
                 frame.className = 'scan-frame';
                 frame.innerHTML = `
@@ -1333,15 +1334,109 @@
                         <div class="frame-corner bottom-right"></div>
                         <div class="scan-line"></div>
                     </div>
-                    <div class="scan-instruction">Наведите камеру на QR-код</div>
+                    <div class="scan-instruction">Наведите на QR-код в рамке</div>
+                    <div class="scan-result" id="scanResult"></div>
                 `;
                 container.appendChild(frame);
+            }
+    
+            startQRScanning() {
+                console.log('🔍 Запускаем распознавание QR-кодов...');
+                
+                const scanFrame = () => {
+                    if (!this.isScanning || !this.video) return;
+    
+                    try {
+                        // Проверяем готовность видео
+                        if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+                            // Настраиваем canvas под размер видео
+                            this.canvas.width = this.video.videoWidth;
+                            this.canvas.height = this.video.videoHeight;
+    
+                            // Рисуем текущий кадр на canvas
+                            this.context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+    
+                            // Получаем данные изображения
+                            const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
+    
+                            // Пытаемся распознать QR-код
+                            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                                inversionAttempts: "dontInvert",
+                            });
+    
+                            // Обрабатываем результат
+                            if (code) {
+                                this.handleQRCodeDetected(code.data);
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Ошибка при распознавании QR:', error);
+                    }
+    
+                    // Продолжаем сканирование
+                    if (this.isScanning) {
+                        this.animationFrame = requestAnimationFrame(scanFrame);
+                    }
+                };
+    
+                // Запускаем цикл сканирования
+                this.animationFrame = requestAnimationFrame(scanFrame);
+            }
+    
+            handleQRCodeDetected(codeText) {
+                // Защита от повторного сканирования того же кода
+                const now = Date.now();
+                if (this.lastScannedCode === codeText && now - (this.lastScanTime || 0) < this.scanCooldown) {
+                    return;
+                }
+    
+                console.log('✅ QR-код распознан:', codeText);
+                
+                this.lastScannedCode = codeText;
+                this.lastScanTime = now;
+    
+                // Показываем визуальную обратную связь
+                this.showScanResult('✅ Код распознан!', 'success');
+                
+                // Вибрация
+                if (navigator.vibrate) {
+                    navigator.vibrate(300);
+                }
+    
+                // Добавляем код в список
+                setTimeout(() => {
+                    this.onScanSuccess(codeText);
+                    this.hideScanResult();
+                }, 1000);
+            }
+    
+            showScanResult(message, type) {
+                const resultEl = document.getElementById('scanResult');
+                if (resultEl) {
+                    resultEl.textContent = message;
+                    resultEl.className = `scan-result ${type}`;
+                }
+            }
+    
+            hideScanResult() {
+                const resultEl = document.getElementById('scanResult');
+                if (resultEl) {
+                    resultEl.style.display = 'none';
+                    resultEl.className = 'scan-result';
+                }
             }
     
             async stopCamera() {
                 console.log('🛑 Останавливаем камеру...');
                 
                 this.isScanning = false;
+                this.lastScannedCode = null;
+    
+                // Останавливаем анимацию сканирования
+                if (this.animationFrame) {
+                    cancelAnimationFrame(this.animationFrame);
+                    this.animationFrame = null;
+                }
     
                 // Останавливаем видео
                 if (this.video) {
@@ -1353,9 +1448,7 @@
     
                 // Останавливаем поток
                 if (this.stream) {
-                    this.stream.getTracks().forEach(track => {
-                        track.stop();
-                    });
+                    this.stream.getTracks().forEach(track => track.stop());
                     this.stream = null;
                 }
     
@@ -1368,72 +1461,13 @@
                 if (startBtn) startBtn.classList.remove('hidden');
                 if (stopBtn) stopBtn.classList.add('hidden');
     
-                await this.delay(100);
-            }
-    
-            handleCameraError(error) {
-                console.error('Ошибка камеры:', error);
-                
-                let message = 'Не удалось получить доступ к камере';
-                
-                if (error.name === 'NotAllowedError') {
-                    message = 'Доступ к камере запрещен. Разрешите доступ в настройках браузера.';
-                } else if (error.name === 'NotFoundError') {
-                    message = 'Камера не найдена. Убедитесь, что камера подключена и доступна.';
-                } else if (error.name === 'NotSupportedError') {
-                    message = 'Ваш браузер не поддерживает доступ к камере.';
-                } else if (error.name === 'NotReadableError') {
-                    message = 'Камера уже используется другим приложением.';
-                } else if (error.message.includes('Таймаут')) {
-                    message = 'Камера не ответила. Попробуйте еще раз.';
-                }
-    
-                this.showNotification(message, 'error');
-                this.showFallbackOptions();
-            }
-    
-            showFallbackOptions() {
-                const reader = document.getElementById('reader');
-                if (reader) {
-                    reader.innerHTML = `
-                        <div class="scanner-fallback">
-                            <div class="fallback-header">
-                                <span class="fallback-icon">📷</span>
-                                <h4>Камера недоступна</h4>
-                            </div>
-                            <div class="fallback-content">
-                                <p>Используйте альтернативные способы добавления кодов:</p>
-                                <div class="fallback-buttons">
-                                    <button class="btn btn-primary" onclick="window.reliableScanner.showManualInput()">
-                                        ✍️ Ввести код вручную
-                                    </button>
-                                    <button class="btn btn-outline" onclick="window.reliableScanner.toggleSimulator()">
-                                        🧪 Тестовые коды
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    reader.classList.remove('hidden');
-                }
-            }
-    
-            showManualInput() {
-                const code = prompt('Введите QR-код вручную:', '0104604063405720219NQNfSwVmcTEST001');
-                if (code && code.trim()) {
-                    this.onScanSuccess(code.trim());
-                }
+                this.hideScanResult();
             }
     
             onScanSuccess(code) {
-                console.log('✅ Код получен:', code);
-                this.showNotification(`Добавлен код: ${code.substring(0, 20)}...`, 'success');
+                console.log('📝 Обрабатываем код:', code);
+                this.showNotification(`Добавлен код: ${code.substring(0, 25)}...`, 'success');
                 this.addToCodesList(code);
-                
-                // Вибрация если доступна
-                if (navigator.vibrate) {
-                    navigator.vibrate(200);
-                }
             }
     
             addToCodesList(code) {
@@ -1444,8 +1478,15 @@
     
                 // Убираем пустое состояние
                 const emptyState = codesList.querySelector('.empty-state');
-                if (emptyState) {
-                    emptyState.remove();
+                if (emptyState) emptyState.remove();
+    
+                // Проверяем дубликаты
+                const existingCodes = Array.from(codesList.querySelectorAll('.code-text'))
+                    .map(el => el.textContent);
+                
+                if (existingCodes.includes(code)) {
+                    this.showNotification('Этот код уже был добавлен', 'error');
+                    return;
                 }
     
                 // Добавляем код
@@ -1453,7 +1494,7 @@
                 codeItem.className = 'code-item';
                 codeItem.innerHTML = `
                     <span class="code-text">${code}</span>
-                    <button class="btn btn-sm btn-outline" onclick="this.parentElement.remove(); window.reliableScanner.updateTotalCodes();">
+                    <button class="btn btn-sm btn-outline" onclick="this.parentElement.remove(); window.qrScanner.updateTotalCodes();">
                         🗑️
                     </button>
                 `;
@@ -1473,11 +1514,50 @@
                 }
             }
     
+            // Остальные методы остаются такими же...
+            handleCameraError(error) {
+                console.error('Ошибка камеры:', error);
+                let message = 'Не удалось получить доступ к камере';
+                
+                if (error.name === 'NotAllowedError') {
+                    message = 'Доступ к камере запрещен';
+                } else if (error.name === 'NotFoundError') {
+                    message = 'Камера не найдена';
+                }
+    
+                this.showNotification(message, 'error');
+                this.showFallbackOptions();
+            }
+    
+            showFallbackOptions() {
+                const reader = document.getElementById('reader');
+                if (reader) {
+                    reader.innerHTML = `
+                        <div class="scanner-fallback">
+                            <h4>📷 Камера недоступна</h4>
+                            <p>Используйте другие способы:</p>
+                            <button class="btn btn-primary" onclick="window.qrScanner.showManualInput()">
+                                ✍️ Ввести код
+                            </button>
+                            <button class="btn btn-outline" onclick="window.qrScanner.toggleSimulator()">
+                                🧪 Тестовые коды
+                            </button>
+                        </div>
+                    `;
+                    reader.classList.remove('hidden');
+                }
+            }
+    
+            showManualInput() {
+                const code = prompt('Введите QR-код:', '0104604063405720219NQNfSwVmcTEST001');
+                if (code && code.trim()) {
+                    this.onScanSuccess(code.trim());
+                }
+            }
+    
             toggleSimulator() {
                 const simulator = document.getElementById('simulator');
-                if (simulator) {
-                    simulator.classList.toggle('hidden');
-                }
+                if (simulator) simulator.classList.toggle('hidden');
             }
     
             simulateScan(code) {
@@ -1485,12 +1565,7 @@
             }
     
             showNotification(message, type) {
-                // Простое уведомление через alert
-                if (type === 'error') {
-                    alert('❌ ' + message);
-                } else {
-                    alert('✅ ' + message);
-                }
+                alert(type === 'error' ? '❌ ' + message : '✅ ' + message);
             }
     
             delay(ms) {
@@ -1499,27 +1574,26 @@
     
             setupUI() {
                 const startBtn = document.getElementById('startCamera');
-                if (startBtn) {
-                    startBtn.disabled = !this.supportsCamera;
-                    if (!this.supportsCamera) {
-                        startBtn.title = 'Камера не поддерживается в вашем браузере';
-                    }
-                }
+                if (startBtn) startBtn.disabled = !this.supportsCamera;
             }
         }
     
-        // Инициализация при загрузке
+        // Инициализация
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 Запускаем ReliableScanner');
+            console.log('🚀 Запускаем QRScanner с распознаванием');
             
-            window.reliableScanner = new ReliableScanner();
-            window.reliableScanner.init();
+            // Проверяем наличие библиотеки jsQR
+            if (typeof jsQR === 'undefined') {
+                console.error('❌ Библиотека jsQR не загружена!');
+                alert('Ошибка: Библиотека распознавания QR-кодов не загружена');
+                return;
+            }
     
-            // Глобальные функции
-            window.simulateScan = (code) => window.reliableScanner.simulateScan(code);
-            window.toggleSimulator = () => window.reliableScanner.toggleSimulator();
-            
-            console.log('✅ ReliableScanner инициализирован');
+            window.qrScanner = new QRScanner();
+            window.qrScanner.init();
+    
+            window.simulateScan = (code) => window.qrScanner.simulateScan(code);
+            window.toggleSimulator = () => window.qrScanner.toggleSimulator();
         });
     </script>
 </body>
