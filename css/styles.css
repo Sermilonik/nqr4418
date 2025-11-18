@@ -967,17 +967,42 @@ h1 {
 }
 
 .contractor-dropdown {
-    max-height: 200px;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior: contain;
     position: absolute;
-    z-index: 1000;
+    top: 100%;
+    left: 0;
+    right: 0;
     background: white;
-    width: 100%;
-    border: 1px solid #ddd;
+    border: 2px solid #e0e0e0;
     border-top: none;
     border-radius: 0 0 8px 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    
+    /* ДЛЯ МОБИЛЬНОЙ ПРОКРУТКИ */
+    -webkit-overflow-scrolling: touch; /* Плавная прокрутка на iOS */
+    overscroll-behavior: contain; /* Предотвращает скролл body */
+    scrollbar-width: thin; /* Тонкий скроллбар для Firefox */
+}
+
+/* СТИЛИ ДЛЯ СКРОЛЛБАРА В ВЫПАДАЮЩЕМ СПИСКЕ */
+.contractor-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.contractor-dropdown::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.contractor-dropdown::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.contractor-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
 }
 
 @supports (-webkit-touch-callout: none) {
@@ -1083,14 +1108,36 @@ h1 {
 
 /*адаптивность для мобильных*/
 @media (max-width: 768px) {
-    .dropdown-item {
-        padding: 18px 16px; /* Еще больше для мобильных */
-        font-size: 18px; /* Увеличиваем шрифт */
+    .contractor-dropdown {
+        max-height: 60vh; /* Ограничиваем высоту на мобильных */
+        border: 2px solid #007bff; /* Выделяем границу */
+        border-top: none;
+        position: fixed; /* 🔥 Меняем на fixed для мобильных */
+        top: auto;
+        bottom: 0;
+        left: 10px;
+        right: 10px;
+        max-height: 70vh;
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
     }
     
-    .contractor-dropdown {
-        max-height: 50vh; /* Ограничиваем высоту */
-        border: 2px solid #007bff; /* Выделяем границу */
+    /* УВЕЛИЧИВАЕМ РАЗМЕРЫ ДЛЯ ТАЧ-УСТРОЙСТВ */
+    .dropdown-item {
+        padding: 18px 16px;
+        font-size: 18px;
+        min-height: 60px; /* Минимальная высота для удобного тапа */
+        display: flex;
+        align-items: center;
+        -webkit-tap-highlight-color: transparent; /* Убираем синий highlight */
+    }
+    
+    .contractor-name {
+        font-size: 18px;
+    }
+    
+    .contractor-category {
+        font-size: 16px;
     }
 }
 
