@@ -371,6 +371,9 @@
                 this.pdfGenerator = null;
                 this.notificationManager = new NotificationManager();
                 this.cleaningUp = false;
+
+                this._stopInProgress = false; // Защита от множественных остановок
+                this._cleanupTimeout = null; // Таймер очистки
                 
                 // Сохраняем глобальную ссылку
                 window.scannerManager = this;
@@ -968,11 +971,22 @@
             }
 
             async stopCamera() {
+                if (this._stopInProgress) {
+                    console.log('⚠️ Остановка камеры уже выполняется...');
+                    return;
+                }
+                
+                if (this._cleanupTimeout) {
+                    clearTimeout(this._cleanupTimeout);
+                    this._cleanupTimeout = null;
+                }
+
                 console.log('🧹 Начинаем полную очистку камеры...');
                 
                 // ФЛАГ ОЧИСТКИ
                 this.cleaningUp = true;
-                
+                this._stopInProgress = true;
+
                 try {
                     // 1. ОСТАНАВЛИВАЕМ СКАНЕР
                     if (this.scanner) {
@@ -1066,6 +1080,8 @@
                     console.error('❌ Критическая ошибка при очистке камеры:', error);
                 } finally {
                     this.cleaningUp = false;
+                    this._stopInProgress = false;
+            console.log('✅ Флаги очистки сброшены');
                 }
             }
 
@@ -1560,6 +1576,26 @@
                 // Реализация фильтрации списка контрагентов
                 console.log('🔍 Фильтрация списка контрагентов...');
             }
+
+            // Мягкий деструктор для очистки ресурсов
+            destroy() {
+                console.log('🧹 Вызов деструктора ScannerManager...');
+                
+                // Останавливаем камеру если запущена
+                if (this.isScanning) {
+                    this.stopCamera().catch(error => {
+                        console.log('⚠️ Ошибка в деструкторе:', error);
+                    });
+                }
+                
+                // Очищаем таймеры
+                if (this._cleanupTimeout) {
+                    clearTimeout(this._cleanupTimeout);
+                    this._cleanupTimeout = null;
+                }
+                
+                console.log('✅ ScannerManager уничтожен');
+            }
         }
 
         // ИНИЦИАЛИЗАЦИЯ
@@ -1571,21 +1607,14 @@
     </script>
 
     <script>
-        // ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ДЛЯ ОЧИСТКИ КАМЕРЫ
-        window.addEventListener('beforeunload', () => {
-            console.log('🧹 Очищаем камеру перед уходом со страницы...');
-            if (window.scannerManager) {
-                window.scannerManager.forceCleanup();
-            }
-        });
-        
         // ОБРАБОТКА ВИДИМОСТИ СТРАНИЦЫ
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
+            if (document.hidden && window.scannerManager && window.scannerManager.isScanning) {
                 console.log('📄 Страница скрыта, останавливаем камеру...');
-                if (window.scannerManager && window.scannerManager.isScanning) {
-                    window.scannerManager.stopCamera();
-                }
+                // Используем мягкую остановку вместо forceCleanup
+                window.scannerManager.stopCamera().catch(error => {
+                    console.log('⚠️ Ошибка при остановке камеры:', error);
+                });
             }
         });
         
@@ -1593,9 +1622,14 @@
         document.addEventListener('click', (e) => {
             const link = e.target.closest('a');
             if (link && link.href && link.href !== window.location.href) {
-                console.log('🔗 Обнаружен переход по ссылке, очищаем камеру...');
-                if (window.scannerManager) {
-                    window.scannerManager.forceCleanup();
+                if (window.scannerManager && window.scannerManager.isScanning) {
+                    console.log('🔗 Обнаружен переход по ссылке, очищаем камеру...');
+                    // Мягкая остановка с задержкой для завершения переходов
+                    setTimeout(() => {
+                        window.scannerManager.stopCamera().catch(error => {
+                            console.log('⚠️ Ошибка при остановке камеры для перехода:', error);
+                        });
+                    }, 100);
                 }
             }
         });
