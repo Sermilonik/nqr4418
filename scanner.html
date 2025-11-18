@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR Сканер - Складской модуль</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
     
     <!-- ПОДКЛЮЧАЕМ СУЩЕСТВУЮЩИЕ СТИЛИ -->
     <link rel="stylesheet" href="css/styles.css">
@@ -397,7 +398,7 @@
                     }
                 }, 500);
 
-                showSuccess('Складской модуль готов к работе', 3000);
+                // showSuccess('Складской модуль готов к работе', 3000);
             }
 
             // ЗАГРУЗКА КОНТРАГЕНТОВ
@@ -1114,6 +1115,12 @@
                 
                 // ПРОВЕРЯЕМ, НЕ ЗАБЛОКИРОВАНА ЛИ КАМЕРА
                 try {
+                    // Проверяем доступность mediaDevices
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+                        console.warn('⚠️ mediaDevices не поддерживается в этом браузере');
+                        return false;
+                    }
+                    
                     const devices = await navigator.mediaDevices.enumerateDevices();
                     const videoDevices = devices.filter(device => device.kind === 'videoinput');
                     console.log('📸 Доступные видеоустройства:', videoDevices.length);
@@ -1124,12 +1131,16 @@
                         return false;
                     }
                     
-                    // ПРОВЕРЯЕМ РАЗРЕШЕНИЯ
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    stream.getTracks().forEach(track => track.stop());
-                    
-                    console.log('✅ Камера доступна для запуска');
-                    return true;
+                    // ПРОВЕРЯЕМ РАЗРЕШЕНИЯ (только если есть устройства)
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        stream.getTracks().forEach(track => track.stop());
+                        console.log('✅ Камера доступна для запуска');
+                        return true;
+                    } catch (error) {
+                        console.warn('⚠️ Нет разрешения на камеру:', error.message);
+                        return false;
+                    }
                     
                 } catch (error) {
                     console.error('❌ Камера заблокирована после возврата:', error);
