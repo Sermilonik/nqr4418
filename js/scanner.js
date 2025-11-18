@@ -16,27 +16,18 @@ class ScannerManager {
 
     init() {
         console.log('🚀 Инициализация ScannerManager');
-        addToScannerConsole('🚀 Инициализация ScannerManager', 'info');
+        
+        // Безопасный вызов addToScannerConsole
+        setTimeout(() => {
+            if (window.addToScannerConsole) {
+                window.addToScannerConsole('🚀 Сканер инициализирован', 'info');
+            }
+        }, 100);
         
         this.loadContractors();
         this.attachEventListeners();
         this.checkExistingSession();
         this.checkNotifications();
-    
-        // Проверяем наличие отчетов при загрузке
-        setTimeout(() => {
-            this.loadReportsHistory();
-            
-            // Отладочная информация
-            const warehouseReports = JSON.parse(localStorage.getItem('warehouse_reports') || '[]');
-            const appStateReports = appState.getReports();
-            
-            addToScannerConsole(`📊 Стартовая диагностика:`, 'debug');
-            addToScannerConsole(`   warehouse_reports: ${warehouseReports.length}`, 'debug');
-            addToScannerConsole(`   appState reports: ${appStateReports.length}`, 'debug');
-            addToScannerConsole(`   contractors: ${this.allContractors.length}`, 'debug');
-            
-        }, 1000);
     
         showSuccess('Складской модуль готов к работе', 3000);
     }
