@@ -23,26 +23,29 @@
 
         <!-- ВЫБОР КОНТРАГЕНТОВ -->
         <div class="card">
-            <h3>1. Выберите контрагентов</h3>
-
-            <div class="contractor-search">
-                <input type="text" id="contractorSearch" placeholder="🔍 Начните вводить название контрагента..." 
-                       class="form-select" autocomplete="off">
-                <div id="contractorDropdown" class="contractor-dropdown hidden"></div>
-            </div>
-
-            <div id="selectedContractors" class="selected-contractors hidden">
-                <div class="selected-header">
-                    <span>Выбрано контрагентов: <strong id="selectedCount">0</strong></span>
-                    <button class="btn btn-sm btn-outline" onclick="scannerManager.clearContractors()">
-                        🗑️ Очистить все
-                    </button>
+            <div class="card">
+                <h3>1. Выберите контрагентов</h3>
+            
+                <div class="contractor-search-container">
+                    <div class="contractor-search">
+                        <input type="text" id="contractorSearch" placeholder="🔍 Начните вводить название контрагента..." 
+                               class="form-select" autocomplete="off">
+                        <div id="contractorDropdown" class="contractor-dropdown hidden"></div>
+                    </div>
                 </div>
-                <div id="contractorsList" class="contractors-list">
-                    <!-- Выбранные контрагенты появятся здесь -->
+            
+                <div id="selectedContractors" class="selected-contractors hidden">
+                    <div class="selected-header">
+                        <span>Выбрано контрагентов: <strong id="selectedCount">0</strong></span>
+                        <button class="btn btn-sm btn-outline" onclick="scannerManager.clearContractors()">
+                            🗑️ Очистить все
+                        </button>
+                    </div>
+                    <div id="contractorsList" class="contractors-list">
+                        <!-- Выбранные контрагенты появятся здесь -->
+                    </div>
                 </div>
             </div>
-        </div>
 
         <!-- СТАТУС СЕССИИ -->
         <div id="sessionStatus" class="card status-card hidden">
