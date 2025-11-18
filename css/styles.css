@@ -1367,24 +1367,25 @@ h1 {
     bottom: 0;
     left: 0;
     right: 0;
-    background: rgba(0, 0, 0, 0.9);
+    background: rgba(0, 0, 0, 0.95);
     color: #00ff00;
     font-family: 'Courier New', monospace;
     font-size: 12px;
     z-index: 10000;
-    max-height: 40vh;
+    max-height: 50vh;
     overflow-y: auto;
-    border-top: 2px solid #00ff00;
-    display: none;
+    border-top: 2px solid #007bff;
 }
 
 .console-header {
     background: #333;
-    padding: 8px;
+    padding: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #00ff00;
+    border-bottom: 1px solid #007bff;
+    position: sticky;
+    top: 0;
 }
 
 .console-title {
@@ -1401,38 +1402,43 @@ h1 {
     background: #555;
     color: white;
     border: none;
-    padding: 4px 8px;
+    padding: 5px 10px;
     border-radius: 3px;
-    font-size: 10px;
+    font-size: 11px;
     cursor: pointer;
 }
 
 .console-content {
-    padding: 8px;
+    padding: 10px;
     line-height: 1.4;
+    max-height: 40vh;
+    overflow-y: auto;
 }
 
 .console-log {
-    margin: 2px 0;
+    margin: 3px 0;
     word-break: break-all;
+    border-bottom: 1px solid #333;
+    padding-bottom: 3px;
 }
 
 .console-log.info { color: #00ff00; }
 .console-log.warn { color: #ffff00; }
 .console-log.error { color: #ff4444; }
 .console-log.debug { color: #8888ff; }
+.console-log.success { color: #44ff44; }
 
 .console-toggle {
     position: fixed;
-    bottom: 10px;
-    left: 10px;
+    bottom: 20px;
+    left: 20px;
     background: #007bff;
     color: white;
     border: none;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    font-size: 18px;
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
     cursor: pointer;
     z-index: 10001;
     box-shadow: 0 2px 10px rgba(0,0,0,0.3);
