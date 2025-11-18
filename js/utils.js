@@ -33,3 +33,50 @@ function showNotification(message, type = 'info', duration = 3000) {
         }
     }, duration);
 }
+
+// Утилиты для работы с устройствами
+const DeviceUtils = {
+    // Определение типа устройства
+    getDeviceType() {
+        const ua = navigator.userAgent;
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+            return 'mobile';
+        } else {
+            return 'desktop';
+        }
+    },
+
+    // Проверка поддержки Touch
+    isTouchDevice() {
+        return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    },
+
+    // Получение информации об устройстве
+    getDeviceInfo() {
+        return {
+            type: this.getDeviceType(),
+            userAgent: navigator.userAgent,
+            screen: `${screen.width}x${screen.height}`,
+            touch: this.isTouchDevice(),
+            platform: navigator.platform
+        };
+    }
+};
+
+// Улучшенные уведомления с поддержкой мобильных
+function showNotification(message, type = 'info', duration = 5000) {
+    // Используем существующий showSuccess/Error/Warning для обратной совместимости
+    switch (type) {
+        case 'success':
+            showSuccess(message, duration);
+            break;
+        case 'error':
+            showError(message, duration);
+            break;
+        case 'warning':
+            showWarning(message, duration);
+            break;
+        default:
+            showInfo(message, duration);
+    }
+}
