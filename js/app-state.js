@@ -1,15 +1,9 @@
 class AppState {
     constructor() {
-        this.contractors = [
-            { id: 1, name: 'ООО "Ромашка"', category: 'Оптовый покупатель' },
-            { id: 2, name: 'ИП Иванов', category: 'Розничная сеть' },
-            { id: 3, name: 'ООО "Луч"', category: 'Дилер' },
-            { id: 4, name: 'АО "Вектор"', category: 'Партнер' }
-        ];
-        
+        this.contractors = [];
         this.currentSession = {
             id: null,
-            contractorId: null,
+            contractorIds: [],
             scannedCodes: [],
             createdAt: null
         };
@@ -18,8 +12,30 @@ class AppState {
         this.reports = [];
         this.reportCounter = 1;
         
+        this.init();
+    }
+    
+    init() {
         this.loadFromStorage();
-        this.loadContractorsFromStorage(); // ДОБАВЬТЕ ЭТОТ ВЫЗОВ
+        this.ensureDefaultContractors();
+    }
+    
+    // Гарантируем наличие контрагентов по умолчанию
+    ensureDefaultContractors() {
+        const defaultContractors = [
+            { id: 1, name: 'ООО "Ромашка"', category: 'Оптовый покупатель', createdAt: new Date().toISOString() },
+            { id: 2, name: 'ИП Иванов', category: 'Розничная сеть', createdAt: new Date().toISOString() },
+            { id: 3, name: 'ООО "Луч"', category: 'Дилер', createdAt: new Date().toISOString() },
+            { id: 4, name: 'АО "Вектор"', category: 'Партнер', createdAt: new Date().toISOString() }
+        ];
+        
+        const existingContractors = this.getContractors();
+        
+        if (existingContractors.length === 0) {
+            this.contractors = defaultContractors;
+            this.saveContractors();
+            console.log('✅ Загружены контрагенты по умолчанию');
+        }
     }
 
     // Метод загрузки контрагентов
