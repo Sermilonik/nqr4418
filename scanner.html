@@ -78,6 +78,10 @@
                     <span class="btn-icon">⏹️</span>
                     Выключить камеру
                 </button>
+                <button id="restartCamera" class="btn btn-warning hidden">
+                    <span class="btn-icon">🔄</span>
+                    Перезагрузить камеру
+                </button>
                 <button id="showSimulator" class="btn btn-outline">
                     <span class="btn-icon">🧪</span>
                     Симулятор сканирования
@@ -349,6 +353,14 @@
                 this.attachEventListeners();
                 this.checkExistingSession();
                 this.checkNotifications();
+
+            // ВОССТАНАВЛИВАЕМ СОСТОЯНИЕ КАМЕРЫ ПРИ ПОВТОРНОМ ЗАХОДЕ
+                setTimeout(async () => {
+                    const cameraAvailable = await this.restoreCameraState();
+                    if (!cameraAvailable) {
+                        showWarning('📷 Камера требует перезагрузки страницы для работы', 5000);
+                    }
+                }, 500);
 
                 showSuccess('Складской модуль готов к работе', 3000);
             }
@@ -810,6 +822,8 @@
         }
     }
 
+    
+
     // ПОЛУЧЕНИЕ ЧЕЛОВЕКО-ЧИТАЕМОГО СООБЩЕНИЯ ОБ ОШИБКЕ
     getCameraErrorMessage(error) {
         if (error.message.includes('NotAllowedError')) {
@@ -846,6 +860,58 @@
         }
     }
 
+        // МЕТОД ДЛЯ ПРОВЕРКИ СОСТОЯНИЯ КАМЕРЫ
+        checkCameraHealth() {
+        // Если камера не запущена - ничего не проверяем
+        if (!this.isScanning) return;
+        
+        console.log('🔍 Проверяем состояние камеры...');
+        
+        // Ищем видео элемент внутри контейнера сканера
+        const video = document.querySelector('#reader video');
+        if (!video) {
+            console.warn('⚠️ Видео элемент не найден, но камера запущена');
+            this.showRestartButton();
+            return;
+        }
+        
+        // ПРОВЕРЯЕМ, ЧТО ВИДЕО ИГРАЕТ (не на паузе и не закончилось)
+        if (video.paused || video.ended || video.readyState < 2) {
+            console.warn('⚠️ Видео остановлено, но камера запущена');
+            this.showRestartButton();
+            return;
+        }
+        
+        // ПРОВЕРЯЕМ РАЗМЕРЫ ВИДЕО (черный экран имеет размеры 0x0)
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+            console.warn('⚠️ Видео имеет нулевые размеры (черный экран)');
+            this.showRestartButton();
+            return;
+        }
+        
+        // Если все проверки пройдены - скрываем кнопку перезагрузки
+        this.hideRestartButton();
+        console.log('✅ Камера работает нормально');
+    }
+
+    // ПОКАЗ КНОПКИ ПЕРЕЗАГРУЗКИ КАМЕРЫ
+    showRestartButton() {
+        const restartBtn = document.getElementById('restartCamera');
+        if (restartBtn) {
+            restartBtn.classList.remove('hidden');
+            console.log('🔄 Показываем кнопку перезагрузки камеры');
+        }
+    }
+
+    // СКРЫТИЕ КНОПКИ ПЕРЕЗАГРУЗКИ КАМЕРЫ
+    hideRestartButton() {
+        const restartBtn = document.getElementById('restartCamera');
+        if (restartBtn) {
+            restartBtn.classList.add('hidden');
+            console.log('✅ Скрываем кнопку перезагрузки камеры');
+        }
+    }
+
     // ИНСТРУКЦИИ ДЛЯ CHROME ANDROID
     showChromeAndroidInstructions() {
         const instructions = `
@@ -871,24 +937,211 @@
         }
     }
 
-            // ОСТАНОВКА КАМЕРЫ
-            async stopCamera() {
-                if (this.scanner && this.isScanning) {
-                    try {
-                        await this.scanner.stop();
-                        this.scanner.clear();
-                    } catch (error) {
-                        console.warn('⚠️ Ошибка при остановке камеры:', error);
+    async stopCamera() {
+    console.log('🧹 Начинаем полную очистку камеры...');
+    
+    // ФЛАГ ОЧИСТКИ
+    this.cleaningUp = true;
+    
+    try {
+        // 1. ОСТАНАВЛИВАЕМ СКАНЕР
+        if (this.scanner) {
+            console.log('🛑 Останавливаем сканер...');
+            try {
+                // Пробуем мягкую остановку
+                await this.scanner.stop();
+            } catch (error) {
+                console.log('⚠️ Мягкая остановка не сработала:', error.message);
+                
+                // ЖЕСТКАЯ ОЧИСТКА
+                try {
+                    // Пробуем очистить через внутренние методы
+                    if (this.scanner._html5Qrcode) {
+                        this.scanner._html5Qrcode.stop();
                     }
+                } catch (e) {
+                    console.log('⚠️ Внутренняя очистка не сработала:', e.message);
+                }
+            }
+            
+            // ОЧИЩАЕМ ССЫЛКУ
+            this.scanner = null;
+        }
+        
+        // 2. ОСТАНАВЛИВАЕМ ВСЕ ВИДЕО ПОТОКИ
+        console.log('🎥 Останавливаем все видео потоки...');
+        const videos = document.querySelectorAll('video');
+        videos.forEach(video => {
+            try {
+                video.pause();
+                video.srcObject = null;
+                video.load();
+            } catch (e) {
+                console.log('⚠️ Ошибка остановки видео:', e);
+            }
+        });
+        
+        // 3. ОСТАНАВЛИВАЕМ ВСЕ MEDIA STREAMS
+        console.log('📹 Останавливаем все media streams...');
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            // Получаем все активные треки и останавливаем их
+            const tracks = [...document.querySelectorAll('video')]
+                .map(video => video.srcObject)
+                .filter(stream => stream)
+                .flatMap(stream => stream.getTracks());
+            
+            tracks.forEach(track => {
+                try {
+                    track.stop();
+                } catch (e) {
+                    console.log('⚠️ Ошибка остановки трека:', e);
+                }
+            });
+        }
+        
+        // 4. ОЧИЩАЕМ КОНТЕЙНЕР
+        console.log('🗑️ Очищаем контейнер...');
+        const container = document.getElementById('reader');
+        if (container) {
+            // Сохраняем оверлей, но удаляем все видео элементы
+            const overlay = container.querySelector('.scanner-overlay');
+            container.innerHTML = '';
+            
+            if (overlay) {
+                container.appendChild(overlay);
+                overlay.style.display = 'flex';
+            } else {
+                // Создаем новый оверлей если его нет
+                container.innerHTML = `
+                    <div class="scanner-overlay">
+                        <span class="placeholder-icon">📷</span>
+                        <p>Камера остановлена. Нажмите "Включить камеру"</p>
+                        <div class="scanner-frame"></div>
+                    </div>
+                `;
+            }
+        }
+        
+            // 5. СБРАСЫВАЕМ СОСТОЯНИЕ
+            this.isScanning = false;
+            this.scanner = null;
+            
+            // 6. ОБНОВЛЯЕМ ИНТЕРФЕЙС
+            document.getElementById('startCamera').classList.remove('hidden');
+            document.getElementById('stopCamera').classList.add('hidden');
+            
+            console.log('✅ Камера полностью очищена');
+            
+        } catch (error) {
+            console.error('❌ Критическая ошибка при очистке камеры:', error);
+        } finally {
+            this.cleaningUp = false;
+        }
+    }
+
+    
+
+    // ПЕРЕЗАГРУЗКА КАМЕРЫ
+    async restartCamera() {
+        console.log('🔄 Перезагружаем камеру...');
+        
+        showInfo('🔄 Перезагружаем камеру...', 2000);
+        
+        // ПОЛНАЯ ОЧИСТКА
+        await this.stopCamera();
+        
+        // ЖДЕМ, ЧТОБЫ РЕСУРСЫ ОСВОБОДИЛИСЬ
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // ПРОВЕРЯЕМ ДОСТУПНОСТЬ
+        const cameraAvailable = await this.restoreCameraState();
+        if (!cameraAvailable) {
+            showError('❌ Камера все еще заблокирована. Перезагрузите страницу.');
+            return;
+        }
+        
+        // ЗАПУСКАЕМ ЗАНОВО
+        await this.startCamera();
+    }
+
+    // ОБНОВИТЕ ATTACH EVENT LISTENERS
+    attachEventListeners() {
+        console.log('🔧 Подключаем обработчики событий...');
+        
+        document.getElementById('startCamera').addEventListener('click', () => this.startCamera());
+        document.getElementById('stopCamera').addEventListener('click', () => this.stopCamera());
+        document.getElementById('restartCamera').addEventListener('click', () => this.restartCamera());
+        document.getElementById('showSimulator').addEventListener('click', () => this.showSimulator());
+        document.getElementById('generateReport').addEventListener('click', () => this.generateReport());
+        document.getElementById('clearSession').addEventListener('click', () => this.clearSession());
+        
+        // ... остальные обработчики
+    }
+
+    // ВОССТАНОВЛЕНИЕ КАМЕРЫ ПРИ ПОВТОРНОМ ЗАХОДЕ
+    async restoreCameraState() {
+        console.log('🔁 Проверяем состояние камеры после возврата на страницу...');
+        
+        // ПРОВЕРЯЕМ, НЕ ЗАБЛОКИРОВАНА ЛИ КАМЕРА
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            console.log('📸 Доступные видеоустройства:', videoDevices.length);
+            
+            if (videoDevices.length === 0) {
+                console.warn('⚠️ Видеоустройства не найдены - камера заблокирована');
+                showError('📷 Камера заблокирована. Перезагрузите страницу.');
+                return false;
+            }
+            
+            // ПРОВЕРЯЕМ РАЗРЕШЕНИЯ
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getTracks().forEach(track => track.stop());
+            
+            console.log('✅ Камера доступна для запуска');
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Камера заблокирована после возврата:', error);
+            
+            if (error.name === 'NotAllowedError') {
+                showError('📷 Доступ к камере заблокирован. Разрешите доступ или перезагрузите страницу.');
+            } else {
+                showError('📷 Камера временно недоступна. Перезагрузите страницу.');
+            }
+            
+            return false;
+        }
+    }
+
+    // ПРИНУДИТЕЛЬНАЯ ОЧИСТКА ДЛЯ ПЕРЕХОДОВ МЕЖДУ СТРАНИЦАМИ
+    forceCleanup() {
+        console.log('🚨 ЭКСТРЕННАЯ ОЧИСТКА КАМЕРЫ!');
+        
+        // НЕМЕДЛЕННАЯ ОСТАНОВКА БЕЗ ОЖИДАНИЯ
+        if (this.scanner) {
+            try {
+                // Используем внутренний метод для немедленной остановки
+                if (this.scanner._html5Qrcode) {
+                    this.scanner._html5Qrcode.stop();
                 }
                 
-                this.isScanning = false;
-                this.scanner = null;
+                // Останавливаем все видео элементы
+                const videos = document.querySelectorAll('video');
+                videos.forEach(video => {
+                    video.pause();
+                    video.srcObject = null;
+                });
                 
-                document.getElementById('startCamera').classList.remove('hidden');
-                document.getElementById('stopCamera').classList.add('hidden');
-                document.getElementById('reader').classList.add('hidden');
+            } catch (error) {
+                console.error('🚨 Ошибка экстренной очистки:', error);
             }
+            
+            this.scanner = null;
+        }
+        
+        this.isScanning = false;
+    }
 
             // ОБРАБОТКА УСПЕШНОГО СКАНИРОВАНИЯ
             onScanSuccess(decodedText) {
@@ -1240,5 +1493,35 @@
             console.log('✅ ScannerManager полностью инициализирован');
         });
     </script>
+    <script>
+        // ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ДЛЯ ОЧИСТКИ КАМЕРЫ
+        window.addEventListener('beforeunload', () => {
+            console.log('🧹 Очищаем камеру перед уходом со страницы...');
+            if (window.scannerManager) {
+                window.scannerManager.forceCleanup();
+            }
+        });
+        
+        // ОБРАБОТКА ВИДИМОСТИ СТРАНИЦЫ
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('📄 Страница скрыта, останавливаем камеру...');
+                if (window.scannerManager && window.scannerManager.isScanning) {
+                    window.scannerManager.stopCamera();
+                }
+            }
+        });
+        
+        // ОБРАБОТКА ПЕРЕХОДА ПО ССЫЛКАМ
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            if (link && link.href && link.href !== window.location.href) {
+                console.log('🔗 Обнаружен переход по ссылке, очищаем камеру...');
+                if (window.scannerManager) {
+                    window.scannerManager.forceCleanup();
+                }
+            }
+        });
+        </script>
 </body>
 </html>
