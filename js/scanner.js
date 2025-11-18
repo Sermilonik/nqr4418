@@ -22,13 +22,12 @@ class ScannerManager {
         this.checkExistingSession();
         this.checkNotifications();
     
-        // ПРОВЕРЯЕМ CHROME ANDROID И ПОКАЗЫВАЕМ СПЕЦИАЛЬНУЮ КНОПКУ
+        // Автоматическая синхронизация при загрузке
         setTimeout(() => {
-            const isChromeAndroid = /Chrome/.test(navigator.userAgent) && /Android/.test(navigator.userAgent);
-            if (isChromeAndroid) {
-                this.showChromePermissionButton();
+            if (window.syncManager) {
+                syncManager.autoSync();
             }
-        }, 1000);
+        }, 2000);
     
         showSuccess('Складской модуль готов к работе', 3000);
     }
