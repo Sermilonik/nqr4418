@@ -1663,8 +1663,23 @@
                     console.log(message);
             }
         }
-        
-        // Перехватываем console.log для вывода в нашу консоль
+
+        // Сделаем функцию глобальной для безопасного доступа
+        window.addToScannerConsole = function(message, type = 'info') {
+            const output = document.getElementById('scannerConsoleOutput');
+            if (!output) return;
+            
+            const logElement = document.createElement('div');
+            logElement.className = `console-log ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML = `<span style="color: #888">[${timestamp}]</span> ${message}`;
+            
+            output.appendChild(logElement);
+            output.scrollTop = output.scrollHeight;
+        };
+
+        // Безопасный перехват console.log - без рекурсии
         (function() {
             const originalLog = console.log;
             const originalError = console.error;
@@ -1672,40 +1687,71 @@
             
             console.log = function(...args) {
                 originalLog.apply(console, args);
-                const message = args.map(arg => 
-                    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-                ).join(' ');
-                addToScannerConsole(message, 'info');
+                setTimeout(() => {
+                    try {
+                        const message = args.map(arg => 
+                            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                        ).join(' ');
+                        if (window.addToScannerConsole) {
+                            window.addToScannerConsole(message, 'info');
+                        }
+                    } catch (e) {
+                        // Игнорируем ошибки в перехватчике
+                    }
+                }, 0);
             };
             
             console.error = function(...args) {
                 originalError.apply(console, args);
-                const message = args.map(arg => 
-                    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-                ).join(' ');
-                addToScannerConsole(message, 'error');
+                setTimeout(() => {
+                    try {
+                        const message = args.map(arg => 
+                            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                        ).join(' ');
+                        if (window.addToScannerConsole) {
+                            window.addToScannerConsole(message, 'error');
+                        }
+                    } catch (e) {
+                        // Игнорируем ошибки
+                    }
+                }, 0);
             };
             
             console.warn = function(...args) {
                 originalWarn.apply(console, args);
-                const message = args.map(arg => 
-                    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-                ).join(' ');
-                addToScannerConsole(message, 'warn');
+                setTimeout(() => {
+                    try {
+                        const message = args.map(arg => 
+                            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                        ).join(' ');
+                        if (window.addToScannerConsole) {
+                            window.addToScannerConsole(message, 'warn');
+                        }
+                    } catch (e) {
+                        // Игнорируем ошибки
+                    }
+                }, 0);
             };
         })();
-        
+
         // Автоматически показываем ошибки в консоли
         window.addEventListener('error', function(e) {
-            addToScannerConsole(`❌ Ошибка: ${e.message}`, 'error');
+            setTimeout(() => {
+                if (window.addToScannerConsole) {
+                    window.addToScannerConsole(`❌ Ошибка: ${e.message}`, 'error');
+                }
+            }, 0);
         });
-        
+
         // Инициализация консоли при загрузке
         document.addEventListener('DOMContentLoaded', function() {
-            addToScannerConsole('🚀 Сканер инициализирован', 'info');
-            addToScannerConsole(`📱 Устройство: ${navigator.userAgent}`, 'debug');
+            setTimeout(() => {
+                if (window.addToScannerConsole) {
+                    window.addToScannerConsole('🚀 Сканер инициализирован', 'info');
+                    window.addToScannerConsole(`📱 Устройство: ${navigator.userAgent}`, 'debug');
+                }
+            }, 100);
         });
-        </script>
-
+    </script>
 </body>
 </html>
