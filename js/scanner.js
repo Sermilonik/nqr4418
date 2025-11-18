@@ -16,18 +16,27 @@ class ScannerManager {
 
     init() {
         console.log('🚀 Инициализация ScannerManager');
+        addToScannerConsole('🚀 Инициализация ScannerManager', 'info');
         
         this.loadContractors();
         this.attachEventListeners();
         this.checkExistingSession();
         this.checkNotifications();
     
-        // Автоматическая синхронизация при загрузке
+        // Проверяем наличие отчетов при загрузке
         setTimeout(() => {
-            if (window.syncManager) {
-                syncManager.autoSync();
-            }
-        }, 2000);
+            this.loadReportsHistory();
+            
+            // Отладочная информация
+            const warehouseReports = JSON.parse(localStorage.getItem('warehouse_reports') || '[]');
+            const appStateReports = appState.getReports();
+            
+            addToScannerConsole(`📊 Стартовая диагностика:`, 'debug');
+            addToScannerConsole(`   warehouse_reports: ${warehouseReports.length}`, 'debug');
+            addToScannerConsole(`   appState reports: ${appStateReports.length}`, 'debug');
+            addToScannerConsole(`   contractors: ${this.allContractors.length}`, 'debug');
+            
+        }, 1000);
     
         showSuccess('Складской модуль готов к работе', 3000);
     }
@@ -142,17 +151,38 @@ class ScannerManager {
         console.log('=====================');
     } 
       
+    // ЗАГРУЗКА ИСТОРИИ ОТЧЕТОВ
     loadReportsHistory() {
         try {
-            const reports = this.notificationManager.getPendingReports();
+            console.log('📊 Загружаем историю отчетов...');
+            addToScannerConsole('📊 Загружаем историю отчетов...', 'info');
+            
+            // ПРОВЕРЯЕМ РАЗНЫЕ ИСТОЧНИКИ ДАННЫХ
+            const warehouseReports = JSON.parse(localStorage.getItem('warehouse_reports') || '[]');
+            const appStateReports = appState.getReports();
+            
+            console.log('📁 Источники отчетов:', {
+                warehouse: warehouseReports.length,
+                appState: appStateReports.length
+            });
+            
+            addToScannerConsole(`📁 Отчетов в warehouse: ${warehouseReports.length}, в appState: ${appStateReports.length}`, 'debug');
+
+            // ИСПОЛЬЗУЕМ warehouse_reports КАК ОСНОВНОЙ ИСТОЧНИК
+            const reportsToShow = warehouseReports.length > 0 ? warehouseReports : appStateReports;
+            
+            console.log('📋 Показываем отчетов:', reportsToShow.length);
+            addToScannerConsole(`📋 Показываем отчетов: ${reportsToShow.length}`, 'info');
+
             const reportsList = document.getElementById('reportsList');
             
             if (!reportsList) {
-                console.warn('❌ reportsList element not found');
+                console.error('❌ Элемент reportsList не найден');
+                addToScannerConsole('❌ Элемент reportsList не найден', 'error');
                 return;
             }
-            
-            if (!reports || !Array.isArray(reports) || reports.length === 0) {
+
+            if (reportsToShow.length === 0) {
                 reportsList.innerHTML = `
                     <div class="empty-state">
                         <span class="empty-icon">📄</span>
@@ -162,17 +192,15 @@ class ScannerManager {
                 `;
                 return;
             }
-            
-            // СОРТИРУЕМ ОТЧЕТЫ: сначала необработанные, потом обработанные
-            const sortedReports = [...reports].sort((a, b) => {
-                if (a.status === 'processed' && b.status !== 'processed') return 1;
-                if (a.status !== 'processed' && b.status === 'processed') return -1;
-                return new Date(b.createdAt || b.submittedAt) - new Date(a.createdAt || a.submittedAt);
-            });
-            
+
+            // СОРТИРУЕМ ПО ДАТЕ (новые сверху)
+            const sortedReports = [...reportsToShow].sort((a, b) => 
+                new Date(b.createdAt) - new Date(a.createdAt)
+            );
+
             reportsList.innerHTML = sortedReports.map(report => {
                 const reportId = report.id || 'unknown';
-                const shortId = reportId.slice ? reportId.slice(-6) : reportId;
+                const shortId = reportId.toString().slice(-8);
                 const sequentialNumber = report.sequentialNumber || 'N/A';
                 
                 let contractorName = 'Неизвестно';
@@ -187,19 +215,20 @@ class ScannerManager {
                         <div class="report-header">
                             <div class="report-title">
                                 Отчет #${sequentialNumber}
-                                ${report.status === 'processed' ? '✅' : '🆕'}
+                                ${report.status === 'processed' ? '✅' : 
+                                report.status === 'deleted' ? '🗑️' : '🆕'}
                             </div>
                             <span class="report-status status-${report.status || 'pending'}">
                                 ${report.status === 'pending' ? '⏳ Ожидает' : 
-                                  report.status === 'processed' ? '✅ Обработан' : 
-                                  report.status === 'deleted' ? '🗑️ Удален' : '❓ Неизвестно'}
+                                report.status === 'processed' ? '✅ Обработан' : 
+                                report.status === 'deleted' ? '🗑️ Удален' : '❓ Неизвестно'}
                             </span>
                         </div>
                         <div class="report-details">
                             <div>Порядковый №: ${sequentialNumber}</div>
                             <div>Контрагенты: ${contractorName}</div>
                             <div>Кодов: ${report.codes ? report.codes.length : 0}</div>
-                            <div>Создан: ${new Date(report.submittedAt || report.createdAt || Date.now()).toLocaleString('ru-RU')}</div>
+                            <div>Создан: ${new Date(report.createdAt).toLocaleString('ru-RU')}</div>
                             ${report.status === 'processed' && report.processedAt ? 
                                 `<div>Обработан: ${new Date(report.processedAt).toLocaleString('ru-RU')}</div>` : 
                             report.status === 'deleted' && report.deletedAt ?
@@ -216,17 +245,19 @@ class ScannerManager {
                                     🗑️ Удалить
                                 </button>
                             ` : ''}
-                            ${report.status === 'deleted' ? `
-                                <button class="btn btn-sm btn-danger" onclick="window.scannerManager.removeDeletedReport('${reportId}')">
-                                    🗑️ Удалить локально
-                                </button>
-                            ` : ''}
                         </div>
                     </div>
                 `;
             }).join('');
+
+            console.log('✅ История отчетов обновлена');
+            addToScannerConsole('✅ История отчетов обновлена', 'info');
+
         } catch (error) {
-            console.error('❌ Error loading reports history:', error);
+            const errorMsg = `❌ Ошибка загрузки истории отчетов: ${error.message}`;
+            console.error(errorMsg, error);
+            addToScannerConsole(errorMsg, 'error');
+            
             const reportsList = document.getElementById('reportsList');
             if (reportsList) {
                 reportsList.innerHTML = `
@@ -1535,76 +1566,159 @@ class ScannerManager {
         showSuccess(`Добавлено ${addedCount} тестовых кодов`, 3000);
     }
 
+    // СОЗДАНИЕ ОТЧЕТА
     async generateReport() {
         const session = appState.getCurrentSession();
-        console.log('🔍 Session data:', session);
-        console.log('👥 Selected contractors:', this.selectedContractors);
+        
+        console.log('📋 Начинаем создание отчета...');
+        addToScannerConsole('📋 Начинаем создание отчета...', 'info');
         
         // ВАЛИДАЦИЯ 1: Проверяем есть ли коды
         if (session.scannedCodes.length === 0) {
-            showError('Нет кодов для отчета');
+            const errorMsg = '❌ Нет кодов для отчета';
+            console.error(errorMsg);
+            addToScannerConsole(errorMsg, 'error');
+            showError(errorMsg);
             return;
         }
-    
+
         // ВАЛИДАЦИЯ 2: Проверяем есть ли контрагенты
         if (!this.selectedContractors || this.selectedContractors.length === 0) {
-            showError('Нет выбранных контрагентов');
+            const errorMsg = '❌ Нет выбранных контрагентов';
+            console.error(errorMsg);
+            addToScannerConsole(errorMsg, 'error');
+            showError(errorMsg);
             return;
         }
-    
-        // ВАЛИДАЦИЯ 3: Проверяем соотношение контрагентов и кодов
-        const contractorsCount = this.selectedContractors.length;
-        const codesCount = session.scannedCodes.length;
-        
-        console.log(`📊 Validation: ${contractorsCount} contractors, ${codesCount} codes`);
-        
-        // Нельзя отгрузить меньше кодов чем контрагентов
-        if (codesCount < contractorsCount) {
-            showError(`Нельзя отгрузить ${codesCount} кодов на ${contractorsCount} контрагентов\nМинимум ${contractorsCount} кодов требуется`);
-            return;
-        }
-    
-        // ВАЛИДАЦИЯ 4: Проверяем что коды можно равномерно распределить (опционально)
-        if (codesCount % contractorsCount !== 0) {
-            const warningMessage = `Внимание: ${codesCount} кодов невозможно равномерно распределить между ${contractorsCount} контрагентами\nПродолжить создание отчета?`;
-            
-            if (!confirm(warningMessage)) {
-                return;
-            }
-        }
-    
+
         try {
-            // СОЗДАЕМ ОТЧЕТ С ВСЕМИ ДАННЫМИ ВКЛЮЧАЯ sequentialNumber
+            console.log('🔍 Данные для отчета:', {
+                sessionId: session.id,
+                contractors: this.selectedContractors.length,
+                codes: session.scannedCodes.length
+            });
+            
+            addToScannerConsole(`📊 Контрагентов: ${this.selectedContractors.length}, Кодов: ${session.scannedCodes.length}`, 'info');
+
+            // СОЗДАЕМ ОТЧЕТ С ВСЕМИ ДАННЫМИ
             const report = {
-                id: session.id,
+                id: session.id || this.generateReportId(),
                 contractorId: this.selectedContractors[0].id,
                 contractorName: this.selectedContractors.map(c => c.name).join(', '),
                 contractors: this.selectedContractors,
                 codes: session.scannedCodes,
                 createdAt: new Date().toISOString(),
                 status: 'pending',
-                pdfGenerated: true,
-                // ДОБАВЛЯЕМ sequentialNumber ВРУЧНУЮ
-                sequentialNumber: appState.reportCounter
+                pdfGenerated: false,
+                // Добавляем порядковый номер
+                sequentialNumber: this.getNextReportNumber()
             };
-    
-            console.log('📋 Report data before saving:', report);
-    
-            // СОХРАНЯЕМ ОТЧЕТ В СИСТЕМУ (БЕЗ АВТОМАТИЧЕСКОГО СКАЧИВАНИЯ PDF)
-            this.notificationManager.saveReportForAccountant(report);
+
+            console.log('📄 Создан отчет:', report);
+            addToScannerConsole(`📄 Создан отчет ID: ${report.id}`, 'info');
+
+            // СОХРАНЯЕМ ОТЧЕТ В СИСТЕМУ СКЛАДА
+            console.log('💾 Сохраняем отчет в систему склада...');
+            this.saveReportToWarehouse(report);
+            
+            // СОХРАНЯЕМ ОТЧЕТ В APPSTATE
+            console.log('💾 Сохраняем отчет в appState...');
             appState.saveReport(report);
             
-            setTimeout(() => {
-                this.loadReportsHistory();
-                console.log('✅ Отчет сохранен');
-            }, 100);
+            // ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ БУХГАЛТЕРИИ
+            console.log('📧 Отправляем уведомление бухгалтерии...');
+            this.notifyAccountant(report);
+
+            // ПОКАЗЫВАЕМ УСПЕШНОЕ СООБЩЕНИЕ
+            const successMsg = `✅ Отчет создан! Кодов: ${session.scannedCodes.length}\nОтчет доступен в истории и отправлен бухгалтерии`;
+            console.log(successMsg);
+            addToScannerConsole(successMsg, 'info');
+            showSuccess(successMsg, 5000);
+
+            // ОБНОВЛЯЕМ ИНТЕРФЕЙС
+            this.loadReportsHistory();
             
-            showSuccess(`✅ Отчет создан! Кодов: ${session.scannedCodes.length}\nPDF можно скачать в списке отчетов`, 5000);
-            this.clearSession();
-    
+            // НЕ ОЧИЩАЕМ СЕССИЮ СРАЗУ - даем пользователю возможность проверить
+            setTimeout(() => {
+                this.clearSession();
+                console.log('🗑️ Сессия очищена после создания отчета');
+                addToScannerConsole('🗑️ Сессия очищена', 'info');
+            }, 3000);
+
         } catch (error) {
-            console.error('❌ Ошибка создания отчета:', error);
+            const errorMsg = `❌ Ошибка создания отчета: ${error.message}`;
+            console.error(errorMsg, error);
+            addToScannerConsole(errorMsg, 'error');
+            addToScannerConsole(`🔍 Stack: ${error.stack}`, 'error');
             showError('Ошибка создания отчета');
+        }
+    }
+
+    // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ ОТЧЕТОВ
+
+    // Генерация ID отчета
+    generateReportId() {
+        return 'report_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // Получение следующего порядкового номера
+    getNextReportNumber() {
+        let counter = parseInt(localStorage.getItem('report_counter') || '0');
+        counter++;
+        localStorage.setItem('report_counter', counter.toString());
+        return counter;
+    }
+
+    // Сохранение отчета в систему склада
+    saveReportToWarehouse(report) {
+        try {
+            // Загружаем текущие отчеты склада
+            const warehouseReports = JSON.parse(localStorage.getItem('warehouse_reports') || '[]');
+            
+            // Добавляем новый отчет
+            warehouseReports.unshift(report);
+            
+            // Сохраняем обратно
+            localStorage.setItem('warehouse_reports', JSON.stringify(warehouseReports));
+            
+            console.log('✅ Отчет сохранен в warehouse_reports');
+            addToScannerConsole(`✅ Отчет сохранен в warehouse_reports (всего: ${warehouseReports.length})`, 'info');
+            
+            return true;
+        } catch (error) {
+            console.error('❌ Ошибка сохранения в warehouse_reports:', error);
+            addToScannerConsole('❌ Ошибка сохранения в warehouse_reports', 'error');
+            return false;
+        }
+    }
+
+    // Уведомление бухгалтерии о новом отчете
+    notifyAccountant(report) {
+        try {
+            const notification = {
+                id: 'new_report_' + Date.now(),
+                reportId: report.id,
+                contractorName: report.contractorName,
+                codeCount: report.codes.length,
+                createdAt: new Date().toISOString(),
+                message: `Новый отчет #${report.sequentialNumber} от склада: ${report.contractorName} (${report.codes.length} кодов)`,
+                type: 'new_report',
+                read: false
+            };
+
+            // Сохраняем уведомление
+            const notifications = JSON.parse(localStorage.getItem('warehouse_notifications') || '[]');
+            notifications.unshift(notification);
+            localStorage.setItem('warehouse_notifications', JSON.stringify(notifications));
+            
+            console.log('📧 Уведомление бухгалтерии отправлено');
+            addToScannerConsole('📧 Уведомление бухгалтерии отправлено', 'info');
+            
+            return true;
+        } catch (error) {
+            console.error('❌ Ошибка отправки уведомления:', error);
+            addToScannerConsole('❌ Ошибка отправки уведомления', 'error');
+            return false;
         }
     }
 
