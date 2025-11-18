@@ -1593,5 +1593,119 @@
         }, 5000);
     });
     </script>
+
+    <!-- Мобильная консоль для отладки -->
+    <div id="mobileConsole" class="mobile-console">
+        <div class="console-header">
+            <div class="console-title">🐛 Консоль отладки</div>
+            <div class="console-controls">
+                <button class="console-btn" onclick="clearScannerConsole()">🧹 Очистить</button>
+                <button class="console-btn" onclick="toggleScannerConsole()">✕ Закрыть</button>
+            </div>
+        </div>
+        <div id="scannerConsoleOutput" class="console-content">
+            <!-- Сообщения будут здесь -->
+        </div>
+    </div>
+
+    <!-- Кнопка показа консоли -->
+    <button id="scannerConsoleToggle" class="console-toggle" onclick="toggleScannerConsole()">
+        🐛
+    </button>
+
+    <script>
+        // Функции для консоли сканера
+        let consoleVisible = false;
+        
+        function toggleScannerConsole() {
+            const console = document.getElementById('mobileConsole');
+            const toggleBtn = document.getElementById('scannerConsoleToggle');
+            
+            consoleVisible = !consoleVisible;
+            
+            if (consoleVisible) {
+                console.style.display = 'block';
+                toggleBtn.textContent = '👁️';
+                toggleBtn.style.background = '#dc3545';
+            } else {
+                console.style.display = 'none';
+                toggleBtn.textContent = '🐛';
+                toggleBtn.style.background = '#007bff';
+            }
+        }
+        
+        function clearScannerConsole() {
+            const output = document.getElementById('scannerConsoleOutput');
+            output.innerHTML = '';
+            addToScannerConsole('🧹 Консоль очищена', 'info');
+        }
+        
+        function addToScannerConsole(message, type = 'info') {
+            const output = document.getElementById('scannerConsoleOutput');
+            const logElement = document.createElement('div');
+            logElement.className = `console-log ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML = `<span style="color: #888">[${timestamp}]</span> ${message}`;
+            
+            output.appendChild(logElement);
+            output.scrollTop = output.scrollHeight;
+            
+            // Также выводим в обычную консоль
+            switch (type) {
+                case 'error':
+                    console.error(message);
+                    break;
+                case 'warn':
+                    console.warn(message);
+                    break;
+                default:
+                    console.log(message);
+            }
+        }
+        
+        // Перехватываем console.log для вывода в нашу консоль
+        (function() {
+            const originalLog = console.log;
+            const originalError = console.error;
+            const originalWarn = console.warn;
+            
+            console.log = function(...args) {
+                originalLog.apply(console, args);
+                const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                ).join(' ');
+                addToScannerConsole(message, 'info');
+            };
+            
+            console.error = function(...args) {
+                originalError.apply(console, args);
+                const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                ).join(' ');
+                addToScannerConsole(message, 'error');
+            };
+            
+            console.warn = function(...args) {
+                originalWarn.apply(console, args);
+                const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                ).join(' ');
+                addToScannerConsole(message, 'warn');
+            };
+        })();
+        
+        // Автоматически показываем ошибки в консоли
+        window.addEventListener('error', function(e) {
+            addToScannerConsole(`❌ Ошибка: ${e.message}`, 'error');
+        });
+        
+        // Инициализация консоли при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            addToScannerConsole('🚀 Сканер инициализирован', 'info');
+            addToScannerConsole(`📱 Устройство: ${navigator.userAgent}`, 'debug');
+        });
+        </script>
+
 </body>
 </html>
