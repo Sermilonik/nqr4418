@@ -1,82 +1,124 @@
-// Функции уведомлений
-function showSuccess(message, duration = 3000) {
-    showNotification(message, 'success', duration);
+// Утилиты для уведомлений и вспомогательные функции
+class NotificationUtils {
+    constructor() {
+        this.notificationContainer = null;
+        this.init();
+    }
+
+    init() {
+        // Создаем контейнер для уведомлений если его нет
+        if (!document.getElementById('notificationContainer')) {
+            this.notificationContainer = document.createElement('div');
+            this.notificationContainer.id = 'notificationContainer';
+            document.body.appendChild(this.notificationContainer);
+        } else {
+            this.notificationContainer = document.getElementById('notificationContainer');
+        }
+    }
+
+    showNotification(message, type = 'info', duration = 5000) {
+        try {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    ${message}
+                </div>
+            `;
+
+            // Добавляем в контейнер
+            this.notificationContainer.appendChild(notification);
+
+            // Автоматическое скрытие
+            if (duration > 0) {
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.style.opacity = '0';
+                        notification.style.transform = 'translateX(100%)';
+                        setTimeout(() => {
+                            if (notification.parentNode) {
+                                notification.parentNode.removeChild(notification);
+                            }
+                        }, 300);
+                    }
+                }, duration);
+            }
+
+            // Клик для закрытия
+            notification.addEventListener('click', () => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            });
+
+            // Анимация появления
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+                notification.style.opacity = '1';
+            }, 10);
+
+            return notification;
+
+        } catch (error) {
+            console.error('Error showing notification:', error);
+            // Фолбэк в console
+            const consoleMethod = type === 'error' ? 'error' : 
+                                type === 'warning' ? 'warn' : 'log';
+            console[consoleMethod](`[${type.toUpperCase()}] ${message}`);
+        }
+    }
+}
+
+// Создаем глобальный экземпляр
+const notificationUtils = new NotificationUtils();
+
+// Глобальные функции для обратной совместимости
+function showSuccess(message, duration = 5000) {
+    return notificationUtils.showNotification(message, 'success', duration);
 }
 
 function showError(message, duration = 5000) {
-    showNotification(message, 'error', duration);
+    return notificationUtils.showNotification(message, 'error', duration);
 }
 
-function showWarning(message, duration = 4000) {
-    showNotification(message, 'warning', duration);
+function showWarning(message, duration = 5000) {
+    return notificationUtils.showNotification(message, 'warning', duration);
 }
 
-function showInfo(message, duration = 3000) {
-    showNotification(message, 'info', duration);
+function showInfo(message, duration = 5000) {
+    return notificationUtils.showNotification(message, 'info', duration);
 }
 
-function showNotification(message, type = 'info', duration = 3000) {
-    const container = document.getElementById('notificationContainer');
-    if (!container) return;
-
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    notification.onclick = () => notification.remove();
-
-    container.appendChild(notification);
-
-    // Автоматическое удаление
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.remove();
-        }
-    }, duration);
+// Вспомогательные функции
+function formatDate(date) {
+    return new Date(date).toLocaleString('ru-RU');
 }
 
-// Утилиты для работы с устройствами
-const DeviceUtils = {
-    // Определение типа устройства
-    getDeviceType() {
-        const ua = navigator.userAgent;
-        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
-            return 'mobile';
-        } else {
-            return 'desktop';
-        }
-    },
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
 
-    // Проверка поддержки Touch
-    isTouchDevice() {
-        return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    },
-
-    // Получение информации об устройстве
-    getDeviceInfo() {
-        return {
-            type: this.getDeviceType(),
-            userAgent: navigator.userAgent,
-            screen: `${screen.width}x${screen.height}`,
-            touch: this.isTouchDevice(),
-            platform: navigator.platform
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
         };
-    }
-};
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
 
-// Улучшенные уведомления с поддержкой мобильных
-function showNotification(message, type = 'info', duration = 5000) {
-    // Используем существующий showSuccess/Error/Warning для обратной совместимости
-    switch (type) {
-        case 'success':
-            showSuccess(message, duration);
-            break;
-        case 'error':
-            showError(message, duration);
-            break;
-        case 'warning':
-            showWarning(message, duration);
-            break;
-        default:
-            showInfo(message, duration);
-    }
+// Экспорт для использования в других модулях
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        showSuccess,
+        showError,
+        showWarning,
+        showInfo,
+        formatDate,
+        generateId,
+        debounce
+    };
 }
