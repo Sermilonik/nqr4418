@@ -1728,16 +1728,8 @@
             addToConsole(`❌ Ошибка: ${e.message}`, 'error');
         });
 
-        // Инициализация при загрузке
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(() => {
-                addToConsole('🚀 Страница загружена', 'info');
-                addToConsole(`📱 Устройство: ${navigator.userAgent}`, 'debug');
-            }, 100);
-        });
-
-        // Глобальная функция для обработки выбора контрагента из HTML
-        window.handleContractorSelection = function(contractorId) {
+                // Глобальная функция для обработки выбора контрагента из HTML
+                window.handleContractorSelection = function(contractorId) {
             console.log('🔄 handleContractorSelection вызван с ID:', contractorId);
             
             if (window.scannerManager && typeof window.scannerManager.handleContractorSelection === 'function') {
@@ -1750,6 +1742,14 @@
                 }
             }
         };
+
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                addToConsole('🚀 Страница загружена', 'info');
+                addToConsole(`📱 Устройство: ${navigator.userAgent}`, 'debug');
+            }, 100);
+        });
     </script>
 </body>
 </html>
