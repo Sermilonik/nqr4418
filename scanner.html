@@ -493,8 +493,8 @@
                         
                         return `
                             <div class="dropdown-item ${isSelected ? 'selected' : ''}" 
-                                 data-contractor-id="${contractor.id}"
-                                 onclick="scannerManager.handleContractorSelection(${contractor.id})">
+                                data-contractor-id="${contractor.id}"
+                                onclick="window.handleContractorSelection(${contractor.id})">
                                 <div class="contractor-name">${contractor.name}</div>
                                 <div class="contractor-category">${contractor.category}</div>
                                 ${isSelected ? '<div class="selected-badge">✓ Выбран</div>' : ''}
@@ -1636,122 +1636,85 @@
         
         function clearScannerConsole() {
             const output = document.getElementById('scannerConsoleOutput');
-            output.innerHTML = '';
-            addToScannerConsole('🧹 Консоль очищена', 'info');
-        }
-        
-        function addToScannerConsole(message, type = 'info') {
-            const output = document.getElementById('scannerConsoleOutput');
-            const logElement = document.createElement('div');
-            logElement.className = `console-log ${type}`;
-            
+            if (output) {
+                output.innerHTML = '';
+            }
+            // Ручное добавление сообщения без использования addToScannerConsole
             const timestamp = new Date().toLocaleTimeString();
-            logElement.innerHTML = `<span style="color: #888">[${timestamp}]</span> ${message}`;
-            
-            output.appendChild(logElement);
-            output.scrollTop = output.scrollHeight;
-            
-            // Также выводим в обычную консоль
-            switch (type) {
-                case 'error':
-                    console.error(message);
-                    break;
-                case 'warn':
-                    console.warn(message);
-                    break;
-                default:
-                    console.log(message);
+            if (output) {
+                output.innerHTML = `<div class="console-log info"><span style="color: #888">[${timestamp}]</span> 🧹 Консоль очищена</div>`;
             }
         }
-
-        // Сделаем функцию глобальной для безопасного доступа
+        
+        // Глобальная функция для безопасного доступа
         window.addToScannerConsole = function(message, type = 'info') {
-            const output = document.getElementById('scannerConsoleOutput');
-            if (!output) return;
-            
-            const logElement = document.createElement('div');
-            logElement.className = `console-log ${type}`;
-            
-            const timestamp = new Date().toLocaleTimeString();
-            logElement.innerHTML = `<span style="color: #888">[${timestamp}]</span> ${message}`;
-            
-            output.appendChild(logElement);
-            output.scrollTop = output.scrollHeight;
+            try {
+                const output = document.getElementById('scannerConsoleOutput');
+                if (!output) return;
+                
+                const logElement = document.createElement('div');
+                logElement.className = `console-log ${type}`;
+                
+                const timestamp = new Date().toLocaleTimeString();
+                logElement.innerHTML = `<span style="color: #888">[${timestamp}]</span> ${message}`;
+                
+                output.appendChild(logElement);
+                output.scrollTop = output.scrollHeight;
+            } catch (error) {
+                // Игнорируем ошибки в логгере
+            }
         };
-
-        // Безопасный перехват console.log - без рекурсии
-        (function() {
-            const originalLog = console.log;
-            const originalError = console.error;
-            const originalWarn = console.warn;
-            
-            console.log = function(...args) {
-                originalLog.apply(console, args);
-                setTimeout(() => {
-                    try {
-                        const message = args.map(arg => 
-                            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-                        ).join(' ');
-                        if (window.addToScannerConsole) {
-                            window.addToScannerConsole(message, 'info');
-                        }
-                    } catch (e) {
-                        // Игнорируем ошибки в перехватчике
-                    }
-                }, 0);
-            };
-            
-            console.error = function(...args) {
-                originalError.apply(console, args);
-                setTimeout(() => {
-                    try {
-                        const message = args.map(arg => 
-                            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-                        ).join(' ');
-                        if (window.addToScannerConsole) {
-                            window.addToScannerConsole(message, 'error');
-                        }
-                    } catch (e) {
-                        // Игнорируем ошибки
-                    }
-                }, 0);
-            };
-            
-            console.warn = function(...args) {
-                originalWarn.apply(console, args);
-                setTimeout(() => {
-                    try {
-                        const message = args.map(arg => 
-                            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-                        ).join(' ');
-                        if (window.addToScannerConsole) {
-                            window.addToScannerConsole(message, 'warn');
-                        }
-                    } catch (e) {
-                        // Игнорируем ошибки
-                    }
-                }, 0);
-            };
-        })();
-
-        // Автоматически показываем ошибки в консоли
+        
+        // Глобальная функция для обработки выбора контрагента
+        window.handleContractorSelection = function(contractorId) {
+            console.log('🎯 Глобальный обработчик выбора контрагента:', contractorId);
+            setTimeout(() => {
+                if (window.scannerManager && typeof window.scannerManager.toggleContractor === 'function') {
+                    window.scannerManager.toggleContractor(contractorId);
+                } else {
+                    console.error('❌ ScannerManager не доступен или toggleContractor не функция');
+                }
+            }, 10);
+        };
+        
+        // Простой перехватчик глобальных ошибок
         window.addEventListener('error', function(e) {
-            setTimeout(() => {
-                if (window.addToScannerConsole) {
-                    window.addToScannerConsole(`❌ Ошибка: ${e.message}`, 'error');
-                }
-            }, 0);
+            const timestamp = new Date().toLocaleTimeString();
+            const output = document.getElementById('scannerConsoleOutput');
+            if (output) {
+                output.innerHTML += `<div class="console-log error"><span style="color: #888">[${timestamp}]</span> ❌ Ошибка: ${e.message}</div>`;
+                output.scrollTop = output.scrollHeight;
+            }
         });
-
-        // Инициализация консоли при загрузке
-        document.addEventListener('DOMContentLoaded', function() {
+        
+        // Инициализация при загрузке
+            document.addEventListener('DOMContentLoaded', function() {
+        try {
+            // Небольшая задержка для полной загрузки DOM
             setTimeout(() => {
-                if (window.addToScannerConsole) {
-                    window.addToScannerConsole('🚀 Сканер инициализирован', 'info');
-                    window.addToScannerConsole(`📱 Устройство: ${navigator.userAgent}`, 'debug');
+                if (typeof ScannerManager !== 'undefined') {
+                    window.scannerManager = new ScannerManager();
+                    console.log('✅ ScannerManager полностью инициализирован');
+                    
+                    // Добавляем в консоль сообщение об успешной инициализации
+                    const output = document.getElementById('scannerConsoleOutput');
+                    if (output) {
+                        const timestamp = new Date().toLocaleTimeString();
+                        output.innerHTML += `<div class="console-log success"><span style="color: #888">[${timestamp}]</span> ✅ ScannerManager инициализирован</div>`;
+                    }
+                } else {
+                    console.error('❌ ScannerManager не определен');
                 }
-            }, 100);
-        });
+            }, 500);
+        } catch (error) {
+            console.error('❌ Ошибка инициализации ScannerManager:', error);
+            const output = document.getElementById('scannerConsoleOutput');
+            if (output) {
+                const timestamp = new Date().toLocaleTimeString();
+                output.innerHTML += `<div class="console-log error"><span style="color: #888">[${timestamp}]</span> ❌ Ошибка инициализации: ${error.message}</div>`;
+            }
+        }
+    });
     </script>
 </body>
 </html>
