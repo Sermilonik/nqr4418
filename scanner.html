@@ -1594,13 +1594,32 @@
     });
     </script>
 
-<script>
-    // Функции для консоли сканера - УПРОЩЕННАЯ ВЕРСИЯ БЕЗ ПЕРЕХВАТЧИКОВ
+    <!-- Мобильная консоль для отладки -->
+    <div id="mobileConsole" class="mobile-console" style="display: none;">
+        <div class="console-header">
+            <div class="console-title">🐛 Консоль отладки</div>
+            <div class="console-controls">
+                <button class="console-btn" onclick="clearConsole()">🧹 Очистить</button>
+                <button class="console-btn" onclick="toggleConsole()">✕ Закрыть</button>
+            </div>
+        </div>
+        <div id="consoleOutput" class="console-content">
+            <div class="console-log info">[13:43:42] Консоль инициализирована</div>
+        </div>
+    </div>
+
+    <!-- Кнопка показа консоли -->
+    <button id="consoleToggle" class="console-toggle" onclick="toggleConsole()">
+        🐛
+    </button>
+
+    <script>
+    // Простые функции для консоли
     let consoleVisible = false;
-    
-    function toggleScannerConsole() {
+
+    function toggleConsole() {
         const console = document.getElementById('mobileConsole');
-        const toggleBtn = document.getElementById('scannerConsoleToggle');
+        const toggleBtn = document.getElementById('consoleToggle');
         
         consoleVisible = !consoleVisible;
         
@@ -1608,79 +1627,60 @@
             console.style.display = 'block';
             toggleBtn.textContent = '👁️';
             toggleBtn.style.background = '#dc3545';
+            addToConsole('Консоль открыта', 'info');
         } else {
             console.style.display = 'none';
             toggleBtn.textContent = '🐛';
             toggleBtn.style.background = '#007bff';
         }
     }
-    
-    function clearScannerConsole() {
-        const output = document.getElementById('scannerConsoleOutput');
+
+    function clearConsole() {
+        const output = document.getElementById('consoleOutput');
         if (output) {
             output.innerHTML = '';
+            addToConsole('Консоль очищена', 'info');
         }
-        // Простое добавление сообщения
-        addMessageToConsole('🧹 Консоль очищена', 'info');
     }
-    
-    // Простая функция для добавления сообщений в консоль
-    function addMessageToConsole(message, type = 'info') {
+
+    function addToConsole(message, type = 'info') {
         try {
-            const output = document.getElementById('scannerConsoleOutput');
+            const output = document.getElementById('consoleOutput');
             if (!output) return;
             
+            const timestamp = new Date().toLocaleTimeString();
             const logElement = document.createElement('div');
             logElement.className = `console-log ${type}`;
-            
-            const timestamp = new Date().toLocaleTimeString();
             logElement.innerHTML = `<span style="color: #888">[${timestamp}]</span> ${message}`;
             
             output.appendChild(logElement);
             output.scrollTop = output.scrollHeight;
+            
+            // Также выводим в настоящую консоль
+            if (type === 'error') {
+                console.error(message);
+            } else if (type === 'warn') {
+                console.warn(message);
+            } else {
+                console.log(message);
+            }
         } catch (error) {
-            // Игнорируем ошибки
+            console.error('Ошибка в addToConsole:', error);
         }
     }
-    
-    // Глобальная функция для обработки выбора контрагента
-    window.handleContractorSelection = function(contractorId) {
-        console.log('🎯 Глобальный обработчик выбора контрагента:', contractorId);
-        setTimeout(() => {
-            if (window.scannerManager && typeof window.scannerManager.toggleContractor === 'function') {
-                window.scannerManager.toggleContractor(contractorId);
-            } else {
-                console.error('❌ ScannerManager не доступен');
-            }
-        }, 10);
-    };
-    
-    // Простой перехватчик глобальных ошибок
+
+    // Перехватчик ошибок (только для ошибок, не для console.log)
     window.addEventListener('error', function(e) {
-        addMessageToConsole(`❌ Ошибка: ${e.message}`, 'error');
+        addToConsole(`❌ Ошибка: ${e.message}`, 'error');
     });
-    
+
     // Инициализация при загрузке
     document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
-            addMessageToConsole('🚀 Сканер инициализирован', 'info');
-            addMessageToConsole(`📱 Устройство: ${navigator.userAgent}`, 'debug');
+            addToConsole('🚀 Страница загружена', 'info');
+            addToConsole(`📱 Устройство: ${navigator.userAgent}`, 'debug');
         }, 100);
     });
-    
-    // ИНИЦИАЛИЗАЦИЯ ScannerManager с защитой от ошибок
-    setTimeout(() => {
-        try {
-            if (typeof ScannerManager !== 'undefined') {
-                window.scannerManager = new ScannerManager();
-                addMessageToConsole('✅ ScannerManager инициализирован', 'success');
-            } else {
-                addMessageToConsole('❌ ScannerManager не определен', 'error');
-            }
-        } catch (error) {
-            addMessageToConsole(`❌ Ошибка инициализации: ${error.message}`, 'error');
-        }
-    }, 500);
     </script>
 </body>
 </html>
