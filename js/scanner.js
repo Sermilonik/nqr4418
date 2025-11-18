@@ -747,34 +747,50 @@ class ScannerManager {
 
     // Метод фильтрации
     filterContractors(query = '') {
-        console.log('📱 Mobile filter called with query:', query);
-    
         const dropdown = document.getElementById('contractorDropdown');
         const searchInput = document.getElementById('contractorSearch');
         
-        if (!dropdown || !searchInput) {
-            console.error('❌ Dropdown elements not found');
-            return;
-        }
-        
-        console.log('📱 Is mobile:', this.isMobile());
-        
+        if (!dropdown || !searchInput) return;
+    
+        console.log('🔍 Фильтрация по запросу:', query);
+    
         let filteredContractors = this.allContractors;
         
-        if (query) {
-            const searchTerms = query.toLowerCase().split(/\s+/).filter(term => term.length > 0);
+        if (query && query.trim() !== '') {
+            const searchTerm = query.trim().toLowerCase();
+            console.log('🎯 Ищем:', searchTerm);
+            
+            // 🔥 ИСПРАВЛЕННАЯ ЛОГИКА ПОИСКА
             filteredContractors = this.allContractors.filter(contractor => {
-                const contractorName = contractor.name.toLowerCase();
-                return searchTerms.some(term => contractorName.includes(term));
+                const nameMatch = contractor.name.toLowerCase().includes(searchTerm);
+                const categoryMatch = contractor.category.toLowerCase().includes(searchTerm);
+                
+                // 🔥 ДЕБАГ: Логируем каждый контрагент для проверки
+                if (contractor.name.includes('Ромашка')) {
+                    console.log('🔍 Ромашка проверка:', {
+                        name: contractor.name,
+                        searchTerm: searchTerm,
+                        nameMatch: nameMatch,
+                        categoryMatch: categoryMatch,
+                        includes: contractor.name.toLowerCase().includes(searchTerm)
+                    });
+                }
+                
+                return nameMatch || categoryMatch;
             });
         }
+    
+        console.log('📊 Результаты поиска:', filteredContractors.length);
         
-        console.log('📱 Mobile filtered results:', filteredContractors.length);
-        
-        // Ограничиваем для мобильных
-        filteredContractors = filteredContractors.slice(0, 6);
-        
-        // Рендерим результаты с оптимизацией для мобильных
+        // 🔥 ДЕБАГ: Показываем какие контрагенты найдены
+        if (query) {
+            console.log('📋 Найденные контрагенты:', filteredContractors.map(c => c.name));
+        }
+    
+        // ОГРАНИЧИВАЕМ ДЛЯ УДОБСТВА
+        filteredContractors = filteredContractors.slice(0, 10);
+    
+        // ОТОБРАЖАЕМ РЕЗУЛЬТАТЫ
         if (filteredContractors.length === 0) {
             dropdown.innerHTML = `
                 <div class="dropdown-item no-results">
@@ -784,29 +800,48 @@ class ScannerManager {
             `;
         } else {
             dropdown.innerHTML = filteredContractors.map(contractor => {
-                const isSelected = this.selectedContractors && 
-                    this.selectedContractors.some(c => c.id === contractor.id);
+                const isSelected = this.selectedContractors.some(c => c.id === contractor.id);
+                
+                // 🔥 ПОДСВЕТКА СОВПАДЕНИЙ В РЕЗУЛЬТАТАХ ПОИСКА
+                const highlightedName = this.highlightMatch(contractor.name, query);
+                const highlightedCategory = this.highlightMatch(contractor.category, query);
                 
                 return `
                     <div class="dropdown-item ${isSelected ? 'selected' : ''}" 
                          data-contractor-id="${contractor.id}"
-                         style="padding: 18px 16px; font-size: 18px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                            <div>
-                                <div class="contractor-name">${contractor.name}</div>
-                                <div class="contractor-category">${contractor.category}</div>
-                            </div>
-                            ${isSelected ? '<div class="selected-badge" style="font-size: 20px;">✓</div>' : ''}
+                         onclick="scannerManager.handleContractorSelection(${contractor.id})">
+                        <div class="contractor-info">
+                            <div class="contractor-name">${highlightedName}</div>
+                            <div class="contractor-category">${highlightedCategory}</div>
                         </div>
+                        ${isSelected ? '<div class="selected-badge">✓ Выбран</div>' : ''}
                     </div>
                 `;
             }).join('');
         }
         
-        // Всегда показываем dropdown при поиске на мобильных
-        if (filteredContractors.length > 0 || query) {
+        // 🔥 ВАЖНО: Всегда показываем dropdown при поиске
+        if (query || filteredContractors.length > 0) {
             this.showDropdown();
         }
+    }
+    
+    // 🔥 МЕТОД ДЛЯ ПОДСВЕТКИ СОВПАДЕНИЙ В ПОИСКЕ
+    highlightMatch(text, query) {
+        if (!query || !text) return text;
+        
+        const lowerText = text.toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        const startIndex = lowerText.indexOf(lowerQuery);
+        
+        if (startIndex === -1) return text;
+        
+        const endIndex = startIndex + query.length;
+        const before = text.substring(0, startIndex);
+        const match = text.substring(startIndex, endIndex);
+        const after = text.substring(endIndex);
+        
+        return `${before}<mark style="background: yellow; padding: 2px 0; border-radius: 2px;">${match}</mark>${after}`;
     }
     
     showDropdown() {
