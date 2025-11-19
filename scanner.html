@@ -449,10 +449,14 @@
                 console.log('🔍 Инициализация поиска контрагентов');
 
                 // ПОИСК ПРИ ВВОДЕ
+                let searchTimeout;
                 searchInput.addEventListener('input', (e) => {
-                    const query = e.target.value.trim();
-                    console.log('🔍 Поиск:', query);
-                    this.filterContractors(query);
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        const query = e.target.value.trim();
+                        console.log('🔍 Поиск:', query);
+                        this.filterContractors(query);
+                    }, 300);
                 });
 
                 // ПОКАЗ СПИСКА ПРИ ФОКУСЕ
@@ -463,9 +467,20 @@
                     this.showDropdown();
                 });
 
-                // СКРЫТИЕ ПРИ КЛИКЕ ВНЕ
+                // СКРЫТИЕ ПРИ КЛИКЕ ВНЕ - УЛУЧШЕННАЯ ВЕРСИЯ
                 document.addEventListener('click', (e) => {
-                    if (!dropdown.contains(e.target) && e.target !== searchInput) {
+                    const isSearchInput = e.target === searchInput;
+                    const isInDropdown = dropdown.contains(e.target);
+                    const isDropdownItem = e.target.closest('.dropdown-item');
+                    
+                    if (!isSearchInput && !isInDropdown && !isDropdownItem) {
+                        this.hideDropdown();
+                    }
+                });
+
+                // СКРЫТИЕ ПРИ SCROLL - чтобы список не оставался видимым
+                window.addEventListener('scroll', () => {
+                    if (!dropdown.classList.contains('hidden')) {
                         this.hideDropdown();
                     }
                 });
@@ -511,12 +526,19 @@
                             <div class="dropdown-item ${isSelected ? 'selected' : ''}" 
                                 data-contractor-id="${contractor.id}"
                                 onclick="window.handleContractorSelection(${contractor.id})">
-                                <div class="contractor-name">${contractor.name}</div>
-                                <div class="contractor-category">${contractor.category}</div>
+                                <div class="contractor-info">
+                                    <div class="contractor-name">${contractor.name}</div>
+                                    <div class="contractor-category">${contractor.category}</div>
+                                </div>
                                 ${isSelected ? '<div class="selected-badge">✓ Выбран</div>' : ''}
                             </div>
                         `;
                     }).join('');
+                }
+                
+                // ПОКАЗЫВАЕМ СПИСОК ЕСЛИ ЕСТЬ РЕЗУЛЬТАТЫ
+                if (filteredContractors.length > 0) {
+                    this.showDropdown();
                 }
             }
 
