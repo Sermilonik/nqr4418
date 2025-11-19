@@ -23,30 +23,41 @@
 
         <!-- ВЫБОР КОНТРАГЕНТОВ -->
         <div class="card">
-            <div class="card">
-                <h3>1. Выберите контрагентов</h3>
-            
-                <div class="contractor-search-container">
-                    <div class="contractor-search">
-                        <input type="text" id="contractorSearch" placeholder="🔍 Начните вводить название контрагента..." 
-                               class="form-select" autocomplete="off">
-                        <div id="contractorDropdown" class="contractor-dropdown hidden"></div>
-                    </div>
-                </div>
-            
-                <div id="selectedContractors" class="selected-contractors hidden">
-                    <div class="selected-header">
-                        <span>Выбрано контрагентов: <strong id="selectedCount">0</strong></span>
-                        <button class="btn btn-sm btn-outline" onclick="scannerManager.clearContractors()">
-                            🗑️ Очистить все
-                        </button>
-                    </div>
-                    <div id="contractorsList" class="contractors-list">
-                        <!-- Выбранные контрагенты появятся здесь -->
-                    </div>
+            <h3>1. Выберите контрагентов</h3>
+        
+            <div class="contractor-search-container">
+                <div class="contractor-search">
+                    <input type="text" id="contractorSearch" placeholder="🔍 Начните вводить название контрагента..." 
+                           class="form-select" autocomplete="off">
+                    <div id="contractorDropdown" class="contractor-dropdown hidden"></div>
                 </div>
             </div>
-
+        
+            <!-- === КНОПКИ УПРАВЛЕНИЯ - ДОБАВИТЬ ЗДЕСЬ === -->
+            <div class="contractor-management-buttons">
+                <button class="btn btn-outline btn-sm" onclick="scannerManager.showAddContractorForm()">
+                    ➕ Добавить вручную
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="scannerManager.showImportForm()">
+                    📥 Импорт из Excel/CSV
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="scannerManager.exportContractors()">
+                    📤 Экспорт списка
+                </button>
+            </div>
+        
+            <div id="selectedContractors" class="selected-contractors hidden">
+                <div class="selected-header">
+                    <span>Выбрано контрагентов: <strong id="selectedCount">0</strong></span>
+                    <button class="btn btn-sm btn-outline" onclick="scannerManager.clearContractors()">
+                        🗑️ Очистить все
+                    </button>
+                </div>
+                <div id="contractorsList" class="contractors-list">
+                    <!-- Выбранные контрагенты появятся здесь -->
+                </div>
+            </div>
+        </div>
         <!-- СТАТУС СЕССИИ -->
         <div id="sessionStatus" class="card status-card hidden">
             <div class="status-header">
@@ -1974,77 +1985,66 @@
         });
     </script>
 
-    <div class="contractor-management-buttons">
-        <button class="btn btn-outline btn-sm" onclick="scannerManager.showAddContractorForm()">
-            ➕ Добавить вручную
-        </button>
-        <button class="btn btn-outline btn-sm" onclick="scannerManager.showImportForm()">
-            📥 Импорт из Excel/CSV
-        </button>
-        <button class="btn btn-outline btn-sm" onclick="scannerManager.exportContractors()">
-            📤 Экспорт списка
-        </button>
-    </div>
 
     <!-- ФОРМА ДОБАВЛЕНИЯ КОНТРАГЕНТА -->
-<div id="addContractorForm" class="contractor-form hidden">
-    <h4>➕ Добавить контрагента вручную</h4>
-    <div class="form-group">
-        <label>Название контрагента:</label>
-        <input type="text" id="newContractorName" class="form-select" 
-               placeholder="Например: ООО Ромашка">
+    <div id="addContractorForm" class="contractor-form hidden">
+        <h4>➕ Добавить контрагента вручную</h4>
+        <div class="form-group">
+            <label>Название контрагента:</label>
+            <input type="text" id="newContractorName" class="form-select" 
+                placeholder="Например: ООО Ромашка">
+        </div>
+        <div class="form-group">
+            <label>Категория (опционально):</label>
+            <input type="text" id="newContractorCategory" class="form-select" 
+                placeholder="Например: Оптовый покупатель">
+        </div>
+        <div class="contractor-form-actions">
+            <button class="btn btn-success" onclick="scannerManager.addSingleContractor()">
+                ✅ Добавить
+            </button>
+            <button class="btn btn-outline" onclick="scannerManager.hideAddContractorForm()">
+                ❌ Отмена
+            </button>
+        </div>
     </div>
-    <div class="form-group">
-        <label>Категория (опционально):</label>
-        <input type="text" id="newContractorCategory" class="form-select" 
-               placeholder="Например: Оптовый покупатель">
-    </div>
-    <div class="contractor-form-actions">
-        <button class="btn btn-success" onclick="scannerManager.addSingleContractor()">
-            ✅ Добавить
-        </button>
-        <button class="btn btn-outline" onclick="scannerManager.hideAddContractorForm()">
-            ❌ Отмена
-        </button>
-    </div>
-</div>
 
-<!-- ФОРМА ИМПОРТА КОНТРАГЕНТОВ -->
-<div id="importContractorsForm" class="contractor-form hidden">
-    <h4>📥 Импорт контрагентов из Excel/CSV</h4>
-    
-    <div class="import-format-hint">
-        <strong>Формат данных:</strong><br>
-        • Каждая строка - отдельный контрагент<br>
-        • Только названия (категория определится автоматически)<br>
-        • Пример:<br>
-        <code>1ЛКЗ РУ ООО</code><br>
-        <code>А-РТИ ЦЕНТР ООО</code><br>
-        <code>А3-ГРУПП ООО</code>
+    <!-- ФОРМА ИМПОРТА КОНТРАГЕНТОВ -->
+    <div id="importContractorsForm" class="contractor-form hidden">
+        <h4>📥 Импорт контрагентов из Excel/CSV</h4>
+        
+        <div class="import-format-hint">
+            <strong>Формат данных:</strong><br>
+            • Каждая строка - отдельный контрагент<br>
+            • Только названия (категория определится автоматически)<br>
+            • Пример:<br>
+            <code>1ЛКЗ РУ ООО</code><br>
+            <code>А-РТИ ЦЕНТР ООО</code><br>
+            <code>А3-ГРУПП ООО</code>
+        </div>
+        
+        <div class="form-group">
+            <label>Данные для импорта:</label>
+            <textarea id="importContractorsData" class="csv-textarea" 
+                    placeholder="Вставьте сюда данные из Excel или CSV файла..."></textarea>
+        </div>
+        
+        <div class="contractor-form-actions">
+            <button class="btn btn-success" onclick="scannerManager.importContractors()">
+                📥 Импортировать
+            </button>
+            <button class="btn btn-outline" onclick="scannerManager.hideImportForm()">
+                ❌ Отмена
+            </button>
+            <button class="btn btn-outline" onclick="scannerManager.pasteFromClipboard()">
+                📋 Вставить из буфера
+            </button>
+        </div>
+        
+        <div id="importPreview" class="added-contractors-list hidden">
+            <!-- Предпросмотр добавленных контрагентов -->
+        </div>
     </div>
-    
-    <div class="form-group">
-        <label>Данные для импорта:</label>
-        <textarea id="importContractorsData" class="csv-textarea" 
-                  placeholder="Вставьте сюда данные из Excel или CSV файла..."></textarea>
-    </div>
-    
-    <div class="contractor-form-actions">
-        <button class="btn btn-success" onclick="scannerManager.importContractors()">
-            📥 Импортировать
-        </button>
-        <button class="btn btn-outline" onclick="scannerManager.hideImportForm()">
-            ❌ Отмена
-        </button>
-        <button class="btn btn-outline" onclick="scannerManager.pasteFromClipboard()">
-            📋 Вставить из буфера
-        </button>
-    </div>
-    
-    <div id="importPreview" class="added-contractors-list hidden">
-        <!-- Предпросмотр добавленных контрагентов -->
-    </div>
-</div>
 
     <!-- Мобильная консоль для отладки -->
     <div id="mobileConsole" class="mobile-console" style="display: none;">
