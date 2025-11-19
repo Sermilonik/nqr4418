@@ -158,6 +158,81 @@ class PDFGenerator {
         return doc.output('arraybuffer');
     }
 
+    generateAccountantReport(reportData) {
+        console.log('📊 Generating accountant report:', reportData);
+        
+        const doc = new jspdf.jsPDF();
+        
+        // ЗАГОЛОВОК ДЛЯ БУХГАЛТЕРИИ
+        doc.setFontSize(16);
+        doc.text('ОТЧЕТ ДЛЯ БУХГАЛТЕРИИ - ЧЕСТНЫЙ ЗНАК', 105, 20, { align: 'center' });
+        
+        let yPosition = 40;
+        
+        // ИНФОРМАЦИЯ О КОНТРАГЕНТАХ
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('КОНТРАГЕНТЫ:', 20, yPosition);
+        doc.setFont(undefined, 'normal');
+        yPosition += 8;
+        
+        if (reportData.contractors && Array.isArray(reportData.contractors)) {
+            reportData.contractors.forEach((contractor, index) => {
+                doc.text(`${index + 1}. ${contractor.name} (${contractor.category})`, 25, yPosition);
+                yPosition += 6;
+            });
+        }
+        yPosition += 10;
+        
+        // ТАБЛИЦА КОДОВ ДЛЯ 1С
+        doc.setFont(undefined, 'bold');
+        doc.text('СПИСОК QR-КОДОВ ДЛЯ СПИСАНИЯ:', 20, yPosition);
+        yPosition += 10;
+        
+        // Заголовок таблицы
+        doc.setFillColor(240, 240, 240);
+        doc.rect(20, yPosition, 170, 8, 'F');
+        doc.setFont(undefined, 'bold');
+        doc.text('№', 25, yPosition + 6);
+        doc.text('QR-КОД', 40, yPosition + 6);
+        doc.text('ДАТА СКАНИРОВАНИЯ', 130, yPosition + 6);
+        yPosition += 12;
+        
+        // Данные кодов
+        doc.setFont(undefined, 'normal');
+        reportData.codes.forEach((code, index) => {
+            if (yPosition > 270) {
+                doc.addPage();
+                yPosition = 20;
+            }
+            
+            const codeValue = typeof code === 'string' ? code : code.code;
+            const scanDate = code.timestamp ? 
+                new Date(code.timestamp).toLocaleString('ru-RU') : new Date().toLocaleString('ru-RU');
+            
+            // Чередующийся фон для читаемости
+            if (index % 2 === 0) {
+                doc.setFillColor(250, 250, 250);
+                doc.rect(20, yPosition - 4, 170, 8, 'F');
+            }
+            
+            doc.text(`${index + 1}`, 25, yPosition);
+            doc.text(codeValue, 40, yPosition); // ПОЛНЫЙ КОД ДЛЯ 1С
+            doc.text(scanDate, 130, yPosition);
+            yPosition += 8;
+        });
+        
+        // ФУТЕР С ИНФОРМАЦИЕЙ
+        yPosition += 10;
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Отчет сгенерирован: ${new Date().toLocaleString('ru-RU')}`, 20, yPosition);
+        doc.text(`Всего кодов: ${reportData.codes.length}`, 20, yPosition + 5);
+        doc.text(`Контрагентов: ${reportData.contractors ? reportData.contractors.length : 1}`, 20, yPosition + 10);
+        
+        return doc.output('arraybuffer');
+    }
+
     // В pdf-generator.js добавьте метод транслитерации
     transliterate(text) {
         if (!text) return 'Unknown';
