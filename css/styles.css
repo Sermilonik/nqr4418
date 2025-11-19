@@ -1113,10 +1113,10 @@ h1 {
         max-height: 60vh;
         border: 2px solid #007bff;
         border-top: none;
-        position: fixed;
+        position: absolute;
         top: auto;
-        max-height: 70vh;
-        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+        max-height: 60vh;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     }
     
     /* УВЕЛИЧИВАЕМ РАЗМЕРЫ ДЛЯ ТАЧ-УСТРОЙСТВ */
