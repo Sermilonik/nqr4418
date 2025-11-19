@@ -1523,3 +1523,101 @@ h1 {
     z-index: 10001;
     box-shadow: 0 2px 10px rgba(0,0,0,0.3);
 }
+
+/* Кнопки управления контрагентами */
+.contractor-management-buttons {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0;
+    flex-wrap: wrap;
+}
+
+.contractor-management-buttons .btn {
+    font-size: 12px;
+    padding: 8px 12px;
+    white-space: nowrap;
+}
+
+/* Формы для добавления/импорта контрагентов */
+.contractor-form {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.contractor-form.hidden {
+    display: none;
+}
+
+.contractor-form h4 {
+    margin-bottom: 15px;
+    color: #343a40;
+}
+
+.contractor-form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+/* Поле для импорта CSV */
+.csv-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 14px;
+    resize: vertical;
+}
+
+.csv-textarea:focus {
+    outline: none;
+    border-color: #007bff;
+}
+
+/* Подсказка для формата импорта */
+.import-format-hint {
+    background: #e7f3ff;
+    border: 1px solid #b8daff;
+    border-radius: 6px;
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 12px;
+    color: #004085;
+}
+
+.import-format-hint code {
+    background: #fff;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+/* Список добавленных контрагентов */
+.added-contractors-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 10px 0;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.added-contractor-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    margin-bottom: 5px;
+    background: white;
+    border-radius: 4px;
+    border-left: 3px solid #28a745;
+}
+
+.added-contractor-item:last-child {
+    margin-bottom: 0;
+}
