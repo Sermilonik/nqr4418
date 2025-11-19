@@ -1463,6 +1463,262 @@
                 showWarning('🗑️ Сессия очищена', 3000);
             }
 
+            // ПОКАЗ/СКРЫТИЕ ФОРМ
+            showAddContractorForm() {
+                this.hideAllForms();
+                document.getElementById('addContractorForm').classList.remove('hidden');
+                document.getElementById('newContractorName').focus();
+            }
+
+            hideAddContractorForm() {
+                document.getElementById('addContractorForm').classList.add('hidden');
+                this.clearAddContractorForm();
+            }
+
+            showImportForm() {
+                this.hideAllForms();
+                document.getElementById('importContractorsForm').classList.remove('hidden');
+                document.getElementById('importContractorsData').focus();
+            }
+
+            hideImportForm() {
+                document.getElementById('importContractorsForm').classList.add('hidden');
+                this.clearImportForm();
+            }
+
+            hideAllForms() {
+                this.hideAddContractorForm();
+                this.hideImportForm();
+            }
+
+            // ОЧИСТКА ФОРМ
+            clearAddContractorForm() {
+                document.getElementById('newContractorName').value = '';
+                document.getElementById('newContractorCategory').value = '';
+            }
+
+            clearImportForm() {
+                document.getElementById('importContractorsData').value = '';
+                document.getElementById('importPreview').classList.add('hidden');
+                document.getElementById('importPreview').innerHTML = '';
+            }
+
+            // ДОБАВЛЕНИЕ ОДНОГО КОНТРАГЕНТА
+            addSingleContractor() {
+                const name = document.getElementById('newContractorName').value.trim();
+                const category = document.getElementById('newContractorCategory').value.trim() || 'Импортированный';
+                
+                if (!name) {
+                    showError('❌ Введите название контрагента');
+                    return;
+                }
+                
+                // Проверяем дубликаты
+                if (this.allContractors.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                    showError('❌ Контрагент с таким названием уже существует');
+                    return;
+                }
+                
+                // Создаем нового контрагента
+                const newContractor = {
+                    id: this.generateContractorId(),
+                    name: name,
+                    category: category,
+                    createdAt: new Date().toISOString(),
+                    source: 'manual'
+                };
+                
+                // Добавляем в список
+                this.allContractors.push(newContractor);
+                
+                // Сохраняем в хранилище
+                this.saveContractors();
+                
+                showSuccess(`✅ Контрагент "${name}" добавлен`);
+                this.hideAddContractorForm();
+                this.updateContractorSearch();
+            }
+
+            // ИМПОРТ КОНТРАГЕНТОВ ИЗ CSV/EXCEL
+            importContractors() {
+                const data = document.getElementById('importContractorsData').value.trim();
+                
+                if (!data) {
+                    showError('❌ Введите данные для импорта');
+                    return;
+                }
+                
+                try {
+                    const lines = data.split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0);
+                    
+                    if (lines.length === 0) {
+                        showError('❌ Не найдено данных для импорта');
+                        return;
+                    }
+                    
+                    const newContractors = [];
+                    const duplicates = [];
+                    
+                    lines.forEach((line, index) => {
+                        const name = line.trim();
+                        
+                        if (!name) return;
+                        
+                        // Проверяем дубликаты
+                        const isDuplicate = this.allContractors.some(c => 
+                            c.name.toLowerCase() === name.toLowerCase()
+                        );
+                        
+                        if (isDuplicate) {
+                            duplicates.push(name);
+                            return;
+                        }
+                        
+                        // Определяем категорию по формату названия
+                        const category = this.detectContractorCategory(name);
+                        
+                        const contractor = {
+                            id: this.generateContractorId(),
+                            name: name,
+                            category: category,
+                            createdAt: new Date().toISOString(),
+                            source: 'import',
+                            originalLine: index + 1
+                        };
+                        
+                        newContractors.push(contractor);
+                    });
+                    
+                    if (newContractors.length === 0) {
+                        if (duplicates.length > 0) {
+                            showError(`❌ Все контрагенты уже существуют в системе`);
+                        } else {
+                            showError('❌ Не найдено валидных данных для импорта');
+                        }
+                        return;
+                    }
+                    
+                    // Добавляем новых контрагентов
+                    this.allContractors.push(...newContractors);
+                    this.saveContractors();
+                    
+                    // Показываем результат
+                    let message = `✅ Импортировано ${newContractors.length} контрагентов`;
+                    if (duplicates.length > 0) {
+                        message += ` (пропущено ${duplicates.length} дубликатов)`;
+                    }
+                    
+                    showSuccess(message);
+                    this.hideImportForm();
+                    this.updateContractorSearch();
+                    
+                    // Показываем превью добавленных
+                    this.showImportPreview(newContractors);
+                    
+                } catch (error) {
+                    console.error('❌ Ошибка импорта:', error);
+                    showError('❌ Ошибка при импорте данных');
+                }
+            }
+
+            // ОПРЕДЕЛЕНИЕ КАТЕГОРИИ КОНТРАГЕНТА
+            detectContractorCategory(name) {
+                const lowerName = name.toLowerCase();
+                
+                if (lowerName.includes('ооо') || lowerName.includes('общество с ограниченной ответственностью')) {
+                    return 'ООО';
+                } else if (lowerName.includes('ао') || lowerName.includes('акционерное общество')) {
+                    return 'АО';
+                } else if (lowerName.includes('ип') || lowerName.includes('индивидуальный предприниматель')) {
+                    return 'ИП';
+                } else if (lowerName.includes('зао')) {
+                    return 'ЗАО';
+                } else if (lowerName.includes('оао')) {
+                    return 'ОАО';
+                } else if (/\d{1,2}-\d{3}-\d{3}-\d{2}-\d{2}/.test(name) || /8-\d{3}-\d{3}-\d{2}-\d{2}/.test(name)) {
+                    return 'Физическое лицо';
+                } else {
+                    return 'Импортированный';
+                }
+            }
+
+            // ГЕНЕРАЦИЯ ID ДЛЯ КОНТРАГЕНТА
+            generateContractorId() {
+                return Math.max(0, ...this.allContractors.map(c => c.id)) + 1;
+            }
+
+            // СОХРАНЕНИЕ КОНТРАГЕНТОВ В ХРАНИЛИЩЕ
+            saveContractors() {
+                localStorage.setItem('honest_sign_contractors', JSON.stringify(this.allContractors));
+                console.log('💾 Контрагенты сохранены:', this.allContractors.length);
+            }
+
+            // ОБНОВЛЕНИЕ ПОИСКА КОНТРАГЕНТОВ
+            updateContractorSearch() {
+                // Обновляем выпадающий список если он открыт
+                const searchInput = document.getElementById('contractorSearch');
+                if (searchInput && searchInput.value.trim()) {
+                    this.filterContractors(searchInput.value.trim());
+                }
+            }
+
+            // ЭКСПОРТ КОНТРАГЕНТОВ
+            exportContractors() {
+                const data = this.allContractors.map(c => c.name).join('\n');
+                
+                const blob = new Blob([data], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                
+                link.href = url;
+                link.download = `контрагенты_${new Date().toISOString().split('T')[0]}.txt`;
+                link.click();
+                
+                URL.revokeObjectURL(url);
+                showSuccess(`📤 Экспортировано ${this.allContractors.length} контрагентов`);
+            }
+
+            // ВСТАВКА ИЗ БУФЕРА ОБМЕНА
+            async pasteFromClipboard() {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    document.getElementById('importContractorsData').value = text;
+                    showSuccess('📋 Данные вставлены из буфера обмена');
+                } catch (error) {
+                    console.error('❌ Ошибка чтения из буфера:', error);
+                    showError('❌ Не удалось вставить из буфера обмена');
+                }
+            }
+
+        // ПРЕДПРОСМОТР ИМПОРТА
+        showImportPreview(contractors) {
+            const preview = document.getElementById('importPreview');
+            preview.innerHTML = '';
+            
+            if (contractors.length > 0) {
+                preview.classList.remove('hidden');
+                contractors.forEach(contractor => {
+                    const item = document.createElement('div');
+                    item.className = 'added-contractor-item';
+                    item.innerHTML = `
+                        <div>
+                            <strong>${contractor.name}</strong>
+                            <br><small>${contractor.category}</small>
+                        </div>
+                        <div class="text-success">✓</div>
+                    `;
+                    preview.appendChild(item);
+                });
+                
+                // Автоскрытие через 5 секунд
+                setTimeout(() => {
+                    preview.classList.add('hidden');
+                }, 5000);
+            }
+        }
+
             // УВЕДОМЛЕНИЯ
             checkNotifications() {
                 const notifications = this.notificationManager.getWarehouseNotifications();
@@ -1717,6 +1973,78 @@
             }, 5000);
         });
     </script>
+
+    <div class="contractor-management-buttons">
+        <button class="btn btn-outline btn-sm" onclick="scannerManager.showAddContractorForm()">
+            ➕ Добавить вручную
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="scannerManager.showImportForm()">
+            📥 Импорт из Excel/CSV
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="scannerManager.exportContractors()">
+            📤 Экспорт списка
+        </button>
+    </div>
+
+    <!-- ФОРМА ДОБАВЛЕНИЯ КОНТРАГЕНТА -->
+<div id="addContractorForm" class="contractor-form hidden">
+    <h4>➕ Добавить контрагента вручную</h4>
+    <div class="form-group">
+        <label>Название контрагента:</label>
+        <input type="text" id="newContractorName" class="form-select" 
+               placeholder="Например: ООО Ромашка">
+    </div>
+    <div class="form-group">
+        <label>Категория (опционально):</label>
+        <input type="text" id="newContractorCategory" class="form-select" 
+               placeholder="Например: Оптовый покупатель">
+    </div>
+    <div class="contractor-form-actions">
+        <button class="btn btn-success" onclick="scannerManager.addSingleContractor()">
+            ✅ Добавить
+        </button>
+        <button class="btn btn-outline" onclick="scannerManager.hideAddContractorForm()">
+            ❌ Отмена
+        </button>
+    </div>
+</div>
+
+<!-- ФОРМА ИМПОРТА КОНТРАГЕНТОВ -->
+<div id="importContractorsForm" class="contractor-form hidden">
+    <h4>📥 Импорт контрагентов из Excel/CSV</h4>
+    
+    <div class="import-format-hint">
+        <strong>Формат данных:</strong><br>
+        • Каждая строка - отдельный контрагент<br>
+        • Только названия (категория определится автоматически)<br>
+        • Пример:<br>
+        <code>1ЛКЗ РУ ООО</code><br>
+        <code>А-РТИ ЦЕНТР ООО</code><br>
+        <code>А3-ГРУПП ООО</code>
+    </div>
+    
+    <div class="form-group">
+        <label>Данные для импорта:</label>
+        <textarea id="importContractorsData" class="csv-textarea" 
+                  placeholder="Вставьте сюда данные из Excel или CSV файла..."></textarea>
+    </div>
+    
+    <div class="contractor-form-actions">
+        <button class="btn btn-success" onclick="scannerManager.importContractors()">
+            📥 Импортировать
+        </button>
+        <button class="btn btn-outline" onclick="scannerManager.hideImportForm()">
+            ❌ Отмена
+        </button>
+        <button class="btn btn-outline" onclick="scannerManager.pasteFromClipboard()">
+            📋 Вставить из буфера
+        </button>
+    </div>
+    
+    <div id="importPreview" class="added-contractors-list hidden">
+        <!-- Предпросмотр добавленных контрагентов -->
+    </div>
+</div>
 
     <!-- Мобильная консоль для отладки -->
     <div id="mobileConsole" class="mobile-console" style="display: none;">
